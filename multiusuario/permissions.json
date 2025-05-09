@@ -1,0 +1,78 @@
+[
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planArchivos.jsx",
+    "permission": "Plan-archivos cargar nuevo"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planArchivos.jsx",
+    "permission": "Plan-archivos descargar actual"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planArchivos.jsx",
+    "permission": "Plan-archivos descargar plantillas"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planArchivos.jsx",
+    "permission": "Plan-archivos descargar logs"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planResultados.jsx",
+    "permission": "Plan-resultados ejecutar plan"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planResultados.jsx",
+    "permission": "Plan-resultados consultar resultados"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planResultados.jsx",
+    "permission": "Plan-resultados descargar resultados"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\planResultados.jsx",
+    "permission": "Plan-resultados aplicar override"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-archivos cargar nuevo"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-archivos descargar actuales"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-archivos descargar plantillas"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-archivos descargar logs"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polParametros.jsx",
+    "permission": "Politica-parametros guardar cambios"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polParametros.jsx",
+    "permission": "Politica-parametros ejecutar politica"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polParametros.jsx",
+    "permission": "Politica-parametros aplicar montecarlo"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polResultados.jsx",
+    "permission": "Politica-resultados consultar politica"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polResultados.jsx",
+    "permission": "Politica-resultados descargar resultados"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polResultados.jsx",
+    "permission": "Politica-resultados aplicar override"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polResultados.jsx",
+    "permission": "Politica-resultados aplicar override general"
+  }
+]
