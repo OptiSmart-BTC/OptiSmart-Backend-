@@ -1,0 +1,2 @@
+[ERROR] nonExistentFunction is not a function
+{"err":"Exception in thread \"main\" ","level":"error","message":"Error processing daily replenishment plan","service":"user-service","timestamp":"2024-07-11 09:47:53"}
