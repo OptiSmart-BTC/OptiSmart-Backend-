@@ -6,9 +6,14 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
+<<<<<<< HEAD
     "ag-grid-community": "^33.2.1",
     "ag-grid-react": "^33.2.1",
     "archiver": "^7.0.1",
+=======
+    "archiver": "^7.0.1",
+    "axios": "^1.7.7",
+>>>>>>> origin/test
     "bcrypt": "^5.1.0",
     "body-parser": "^1.20.2",
     "chardet": "^1.6.0",
@@ -20,9 +25,16 @@
     "date-fns": "^2.30.0",
     "date-fns-tz": "^2.0.0",
     "debug": "~2.6.9",
+<<<<<<< HEAD
     "ejs": "~2.6.1",
     "exceljs": "^4.3.0",
     "express": "~4.16.1",
+=======
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "exceljs": "^4.3.0",
+    "express": "^4.21.1",
+>>>>>>> origin/test
     "http-errors": "~1.6.3",
     "iconv-lite": "^0.6.3",
     "jschardet": "^3.0.0",

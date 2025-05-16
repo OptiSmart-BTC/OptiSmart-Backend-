@@ -2,9 +2,12 @@ const fs = require('fs');
 const csv = require('csv-parser');
 const moment = require('moment');
 
+<<<<<<< HEAD
 
 
 
+=======
+>>>>>>> origin/test
 const parametroUsuario = process.argv.slice(2)[0];
 const parametroFolder = parametroUsuario.toUpperCase();
 
@@ -12,12 +15,22 @@ const inputFile = `../../${parametroFolder}/csv/in/sku.csv`;
 const logFileName = 'LogdeCargaCSV';
 const logFile = `../../${parametroFolder}/log/${logFileName}.log`;
 
+<<<<<<< HEAD
 
 const fieldValidations = {
   Producto: { type: 'string', pattern: /^[A-Za-z0-9]+$/ },
   Ubicacion: { type: 'string', pattern: /^[A-Za-z0-9]+$/ },
   //OverrideClasificacionABCD: { type: 'string', pattern: /^[ABCD-]$/ },
   //Override_Politica_Inventarios: { type: 'decimalOrBlank' },
+=======
+const fieldValidations = {
+  Producto: { type: 'string', pattern: /^[A-Za-z0-9]+$/ },
+  Ubicacion: { type: 'string', pattern: /^[A-Za-z0-9]+$/ },
+  Origen_Abasto: { type: 'stringnullable', pattern: /^[A-Za-z0-9\s]*$/ }, // Permitir valores vacíos o alfanuméricos
+  Cantidad_Demanda_Indirecta: { type: 'decimal' },
+  Nivel_OA: { type: 'int', validValues: [1, 2, 3] }, // Solo 1, 2 o 3
+
+>>>>>>> origin/test
   Medida_Override: { type: 'stringMO', pattern: /^[A-Za-z0-9 ]+$/ },
   Tipo_Override: { type: 'stringTO', pattern: /^[A-Za-z0-9 ]+$/ },
   MargenUnitario: { type: 'decimal' },
@@ -35,7 +48,10 @@ const fieldValidations = {
 };
 
 function validateField(field, value) {
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/test
   const validation = fieldValidations[field];
 
   if (!validation) {
@@ -45,10 +61,19 @@ function validateField(field, value) {
   switch (validation.type) {
     case 'string':
       return typeof value === 'string' && validation.pattern.test(value);
+<<<<<<< HEAD
     case 'stringnullesp':
       return value === null || value === '' || (typeof value === 'string' && validation.pattern.test(value));
     case 'int':
       return value === null || value === '' || (Number.isInteger(Number(value)));
+=======
+    case 'stringnullable': // Nueva validación para campos que pueden estar vacíos
+      return value === null || value === '' || (typeof value === 'string' && validation.pattern.test(value));
+    case 'stringnullesp':
+      return value === null || value === '' || (typeof value === 'string' && validation.pattern.test(value));
+    case 'int':
+      return value === null || value === '' || Number.isInteger(Number(value));
+>>>>>>> origin/test
     case 'stringMO':
       return (value === 'Cantidad' || value === 'Dias de Cobertura' || value === null || value === '') || 
              (typeof value === 'string' && validation.pattern.test(value));
@@ -68,12 +93,18 @@ function writeToLog(message) {
   fs.appendFileSync(logFile, `${message}\n`);
 }
 
+<<<<<<< HEAD
 
 let hasErrors = false; // Variable para verificar si se encontraron errores
 let filaActual = 0;
 writeToLog(`Paso 03.- Validacion de tipos de Dato`);
 
 
+=======
+let hasErrors = false; // Variable para verificar si se encontraron errores
+let filaActual = 0;
+writeToLog(`Paso 03.- Validación de tipos de dato`);
+>>>>>>> origin/test
 
 fs.createReadStream(inputFile)
   .pipe(csv())
@@ -85,28 +116,45 @@ fs.createReadStream(inputFile)
 
     for (const field in row) {
       const value = row[field];
+<<<<<<< HEAD
       
       if (!validateField(field, value)) {
         isValid = false;
         invalidFields.push(field);
         
+=======
+      if (!validateField(field, value)) {
+        isValid = false;
+        invalidFields.push(field);
+>>>>>>> origin/test
       }
     }
 
     if (!isValid) {
       hasErrors = true;
+<<<<<<< HEAD
       writeToLog(`\t-Fila ${filaActual}, Campo: ${invalidFields.join(', ')}`);
+=======
+      writeToLog(`\t-Fila ${filaActual}, Campo(s): ${invalidFields.join(', ')}`);
+>>>>>>> origin/test
     }
   })
   .on('end', () => {
     try {
       if (hasErrors) {
         console.log('ERROR');
+<<<<<<< HEAD
         const error = new Error('ERROR');
         // Puedes hacer algo con el error si lo necesitas
       } else {
         writeToLog(`\tEl archivo está correcto. No se encontraron errores. Total de filas: ${filaActual}`);
         console.log('EXITO');
+=======
+        writeToLog('Se encontraron errores en el archivo.');
+      } else {
+        writeToLog(`\tEl archivo está correcto. No se encontraron errores. Total de filas: ${filaActual}`);
+        console.log('ÉXITO');
+>>>>>>> origin/test
       }
     } catch (error) {
       console.error('Ocurrió un error al procesar el archivo:', error);

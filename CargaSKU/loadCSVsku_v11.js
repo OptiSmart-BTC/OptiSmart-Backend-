@@ -50,6 +50,12 @@ async function insertCSVDataToMongoDB() {
           Segmentacion_Producto: data.Segmentacion_Producto !== '' ? String(data.Segmentacion_Producto) : 'DEFAULT',
           Ubicacion: String(data.Ubicacion), 
           Desc_Ubicacion: String(data.Desc_Ubicacion) ?? ' ', 
+<<<<<<< HEAD
+=======
+          Origen_Abasto: data.Origen_Abasto || 'Default Value', // Asegúrate de proporcionar un valor predeterminado si es necesario
+          Cantidad_Demanda_Indirecta: parseFloat(data.Cantidad_Demanda_Indirecta) || 0, // Convierte a float y proporciona un valor predeterminado
+          Nivel_OA: data.Nivel_OA || '1', // Asume '1' como valor predeterminado si no se proporciona
+>>>>>>> origin/test
           OverrideClasificacionABCD: (data.OverrideClasificacionABCD !== null && data.OverrideClasificacionABCD !== '' && data.OverrideClasificacionABCD !== ' ') ? String(data.OverrideClasificacionABCD) : '-',
           Override_Min_Politica_Inventarios: overrideMinPoliticaInventarios,
           Override_Max_Politica_Inventarios: overrideMaxPoliticaInventarios,
@@ -59,7 +65,14 @@ async function insertCSVDataToMongoDB() {
           LeadTime_Abasto_Dias: data.LeadTime_Abasto_Dias !== '' ? Number(data.LeadTime_Abasto_Dias) : 1,
           Frecuencia_Revision_Dias: data.Frecuencia_Revision_Dias !== '' ? Number(data.Frecuencia_Revision_Dias) : 1,
           Fill_Rate: data.Fill_Rate !== '' ? Number(data.Fill_Rate) : 1,
+<<<<<<< HEAD
           MOQ: data.MOQ !== '' ? Number(data.MOQ) : 1, 
+=======
+          MOQ: (() => {
+            const value = Number(data.MOQ);
+            return isNaN(value) || value < 1 ? 1 : value;
+          })(),
+>>>>>>> origin/test
           Tamano_Lote: data.Tamano_Lote !== '' ? Number(data.Tamano_Lote) : 1, 
           Unidades_Pallet: data.Unidades_Pallet !== '' ? Number(data.Unidades_Pallet) : 1, 
           Costo_Unidad: (data.Costo_Unidad !== '0' && data.Costo_Unidad !== '' && data.Costo_Unidad !== null && data.Costo_Unidad !== undefined) ? Number(data.Costo_Unidad) : 0.01,

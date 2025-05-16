@@ -16,6 +16,10 @@ const csvFilePath = `../../${parametroFolder}/templates/template-historico_deman
 const collectionName = 'historico_demanda';
 
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/test
  
 // Campos específicos que se incluirán en el archivo CSV
 const desiredFields = [

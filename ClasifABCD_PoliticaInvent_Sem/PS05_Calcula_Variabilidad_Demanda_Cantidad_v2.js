@@ -43,6 +43,7 @@ async function calcularPromedioErrorCuadrado() {
     const weekStart = parseInt(SemanaInicio, 10);
     const yearEnd = parseInt(AñoFin, 10);
     const weekEnd = parseInt(SemanaFin, 10);
+<<<<<<< HEAD
 
     const resultadosAgregados = await db.collection(historicoDemandaCollection).aggregate([
       {
@@ -81,6 +82,87 @@ async function calcularPromedioErrorCuadrado() {
       Ubicacion: resultado.Ubicacion,
       Variabilidad_Demanda_Cantidad: resultado.Demanda_Cantidad / (Math.ceil(diasprom / 7)),
     }));
+=======
+ 
+    writeToLog (` ${yearEnd} ${yearStart} ${weekEnd} ${weekStart}`);
+
+    console.log("Ejecutando agregación en la colección:", historicoDemandaCollection);
+console.log("Parámetros de filtrado - Año:", yearStart, "a", yearEnd, "Semana:", weekStart, "a", weekEnd);
+
+// 📌 Nuevo filtro para considerar cambio de año
+const filtroSemanas = {
+  $match: {
+    $or: [
+      { Year: yearStart, Week: { $gte: weekStart } },  // Últimas semanas del año anterior
+      { Year: yearEnd, Week: { $lte: weekEnd } }       // Primeras semanas del nuevo año
+    ]
+  }
+};
+
+const resultadosAgregados = await db.collection(historicoDemandaCollection).aggregate([
+  filtroSemanas,
+  {
+    $group: {
+      _id: {
+        Producto: "$Producto",
+        Ubicacion: "$Ubicacion"
+      },
+      Demanda_Cantidad: { $sum: "$Error_Cuadrado_Cantidad" }
+    }
+  },
+  {
+    $addFields: {
+      Producto: "$_id.Producto",
+      Ubicacion: "$_id.Ubicacion"
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      Producto: 1,
+      Ubicacion: 1,
+      Demanda_Cantidad: 1
+    }
+  }
+]).toArray();
+
+// 📌 LOG: Mostrar los resultados de la agregación
+console.log("Resultados de la agregación:");
+console.table(resultadosAgregados);
+
+// 📌 Validación: Si no hay datos, avisar y salir
+if (resultadosAgregados.length === 0) {
+  console.warn("⚠️ No se encontraron datos con los filtros aplicados. Verifica que existan registros en la BD.");
+}
+
+// 📌 LOG: Verificar si `diasprom` es correcto antes de dividir
+console.log("Valor de diasprom:", diasprom);
+console.log("Cálculo de semanas (Math.ceil(diasprom / 7)):", Math.ceil(diasprom / 7));
+
+const resultadosDivididos = resultadosAgregados.map(resultado => {
+  const variabilidad = resultado.Demanda_Cantidad / (Math.ceil(diasprom / 7));
+  
+  // 📌 LOG: Mostrar el cálculo para cada resultado
+  console.log(`Producto: ${resultado.Producto}, Ubicación: ${resultado.Ubicacion}`);
+  console.log(`Demanda_Cantidad: ${resultado.Demanda_Cantidad}`);
+  console.log(`Variabilidad_Demanda_Cantidad calculada: ${variabilidad}`);
+
+  return {
+    Producto: resultado.Producto,
+    Ubicacion: resultado.Ubicacion,
+    Variabilidad_Demanda_Cantidad: variabilidad
+  };
+});
+
+// 📌 LOG: Mostrar todos los resultados finales después de la división
+console.log("Resultados finales con Variabilidad_Demanda_Cantidad:");
+console.table(resultadosDivididos);
+ 
+
+
+   
+
+>>>>>>> origin/test
     
     const demandaAbcd01Collection = db.collection('politica_inventarios_01_sem');
     
@@ -90,9 +172,13 @@ async function calcularPromedioErrorCuadrado() {
         { $set: { Variabilidad_Demanda_Cantidad: resultado.Variabilidad_Demanda_Cantidad } }
       );
     }
+<<<<<<< HEAD
     //const formattedResult = JSON.stringify(resultadosDivididos, null, 2);
     //writeToLog(formattedResult);
 
+=======
+    
+>>>>>>> origin/test
     const politicaInventariosCollection = db.collection('politica_inventarios_01_sem');
 
     const resul = await politicaInventariosCollection.find({}).toArray();

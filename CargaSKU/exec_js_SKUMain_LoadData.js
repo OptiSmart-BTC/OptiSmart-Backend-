@@ -28,6 +28,11 @@ const archivos = [
   { nombre: 'Mueve_SKUcsvProcesados_v2.js', parametros: `${parametroFolder}` },
   { nombre: 'LimpiaEspaciosSKU_v4.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'CsvTempl_sku_v3.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
+<<<<<<< HEAD
+=======
+  { nombre: 'calcularNiveles.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` }, // Integración del cálculo de niveles
+
+>>>>>>> origin/test
 ];
  
 const logFileName = 'LogdeCargaCSV';

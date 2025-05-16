@@ -37,6 +37,12 @@ async function eliminarRegistros() {
       Segmentacion_Producto: 'undefined',
       Ubicacion: 'undefined',
       Desc_Ubicacion: 'undefined',
+<<<<<<< HEAD
+=======
+      Origen_Abasto: 'undefined',
+      Cantidad_Demanda_Indirecta: NaN,  // Asumiendo que un valor numérico inválido podría ser NaN
+      Nivel_OA: 'undefined',
+>>>>>>> origin/test
       OverrideClasificacionABCD: 'undefined',
       Override_Min_Politica_Inventarios: 'undefined',
       Override_Max_Politica_Inventarios: 'undefined',

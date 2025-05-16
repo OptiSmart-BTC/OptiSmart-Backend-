@@ -114,6 +114,10 @@ async function crearTablaPoliticaInventarios() {
 
   const collection1 = 'ui_sem_all_pol_inv';
   const collection2 = 'ui_sem_pol_inv_dias_cobertura';
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/test
   const col1 = db.collection(collection1);
   const col2 = db.collection(collection2);
 
@@ -330,7 +334,38 @@ for (const doc of result3) {
   );
 }
 
+<<<<<<< HEAD
 
+=======
+//-----------------------------------------------------------------
+const sourceCollectionName1 = 'politica_inventarios_01_sem'; 
+
+const targetCollectionName1 = 'politica_inventarios_01_sem_backup'; //Limpiar la tabla antes de meter el backup
+
+const sourceCollection1 = db.collection(sourceCollectionName1);
+
+const targetCollection1 = db.collection(targetCollectionName1);
+ 
+const documents1 = await sourceCollection1.find().toArray();
+
+const result111 = await targetCollection1.insertMany(documents1);
+
+console.log(`Se copiaron ${result111.insertedCount} documentos a la colección destino.`);
+//-----------------------------------------------------------------
+const sourceCollectionName = 'ui_sem_all_pol_inv'; 
+
+const targetCollectionName = 'ui_sem_all_pol_inv_backup'; 
+
+const sourceCollection = db.collection(sourceCollectionName);
+
+const targetCollection = db.collection(targetCollectionName);
+ 
+const documents = await sourceCollection.find().toArray();
+
+const result11 = await targetCollection.insertMany(documents);
+
+console.log(`Se copiaron ${result11.insertedCount} documentos a la colección destino.`);
+>>>>>>> origin/test
 
 
     writeToLog(`\tTermina la Union de la Tablas de Politicas de Inventario`);

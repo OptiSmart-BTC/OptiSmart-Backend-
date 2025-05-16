@@ -46,7 +46,19 @@ async function calcularPromedioErrorCuadrado() {
  
 
     const resultadosAgregados = await db.collection(historicoDemandaCollection).aggregate([
+<<<<<<< HEAD
      {
+=======
+    /*  {
+        $match: {
+          Fecha: {
+            $gte: fechaInicioObj,
+            $lte: fechaFinObj
+          }
+        }
+      },*/
+      {
+>>>>>>> origin/test
         $group: {
           _id: {
             Producto: "$Producto", 
@@ -78,6 +90,11 @@ async function calcularPromedioErrorCuadrado() {
       Ubicacion: resultado.Ubicacion,
       Variabilidad_Demanda: resultado.Demanda_Costo / (Math.ceil(diasprom / 7)),
     }));
+<<<<<<< HEAD
+=======
+    console.log("Resultados Divididos:", JSON.stringify(resultadosDivididos, null, 2));
+
+>>>>>>> origin/test
 
     const demandaAbcd01Collection = db.collection('demanda_abcd_01_sem'); 
 

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
 const conex= require('../Configuraciones/ConStrDB');
@@ -8,21 +9,49 @@ const moment = require('moment');
   //const dbName = 'btc_opti_a001';
 
 const { host, puerto } = require('../Configuraciones/ConexionDB');
+=======
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
+
+// Configuración de conexión a la base de datos MongoDB
+//const uri = 'mongodb://127.0.0.1:27017'; // Cambia esto si tu MongoDB se encuentra en un servidor diferente
+//const dbName = 'btc_opti_a001';
+
+const { host, puerto } = require("../Configuraciones/ConexionDB");
+>>>>>>> origin/test
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
+<<<<<<< HEAD
 
 //const uri = `mongodb://${host}:${puerto}/${dbName}`;
 //const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
 const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
+=======
+const uiCollectionName = process.argv.slice(2)[3] || "ui_politica_inventarios";
+
+const allPolInvCollectionName = uiCollectionName.includes("montecarlo")
+  ? "ui_all_pol_inv_montecarlo"
+  : "ui_all_pol_inv";
+//const uri = `mongodb://${host}:${puerto}/${dbName}`;
+//const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
+>>>>>>> origin/test
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
+<<<<<<< HEAD
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`; 
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
+=======
+const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
+>>>>>>> origin/test
 
 async function crearTablaPoliticaInventarios() {
   writeToLog(`\nPaso 21 - Union de Tablas`);
@@ -30,9 +59,16 @@ async function crearTablaPoliticaInventarios() {
   try {
     await client.connect();
 
+<<<<<<< HEAD
     const db = client.db(dbName);
     const Collection1 = db.collection('ui_politica_inventarios');
     const Collection2 = db.collection('ui_all_pol_inv');
+=======
+    const Collection1 = db.collection(uiCollectionName);
+    const Collection2 = db.collection(allPolInvCollectionName);
+    await Collection2.deleteMany({});
+
+>>>>>>> origin/test
     await Collection2.deleteMany({});
     const datosDemanda = await Collection1.find().toArray();
     const politicaInventarios = datosDemanda.map((dato) => {
@@ -62,8 +98,15 @@ async function crearTablaPoliticaInventarios() {
         Prom_LT: dato.Prom_LT,
         DS_LT: dato.DS_LT,
         Override_SI_NO: dato.Override_SI_NO,
+<<<<<<< HEAD
         Override_Min_Politica_Inventarios: dato.Override_Min_Politica_Inventarios,
         Override_Max_Politica_Inventarios: dato.Override_Max_Politica_Inventarios,
+=======
+        Override_Min_Politica_Inventarios:
+          dato.Override_Min_Politica_Inventarios,
+        Override_Max_Politica_Inventarios:
+          dato.Override_Max_Politica_Inventarios,
+>>>>>>> origin/test
         SS_Cantidad: dato.SS_Cantidad,
         Demanda_LT: dato.Demanda_LT,
         MOQ: dato.MOQ,
@@ -105,11 +148,16 @@ async function crearTablaPoliticaInventarios() {
         U_ROQ: 0,
         U_ROP: 0,
         U_META: 0,
+<<<<<<< HEAD
         U_Inventario_Promedio: 0
+=======
+        U_Inventario_Promedio: 0,
+>>>>>>> origin/test
       };
     });
 
     await Collection2.insertMany(politicaInventarios);
+<<<<<<< HEAD
 //---------------------------------------------------------
 
   const collection1 = 'ui_all_pol_inv';
@@ -261,10 +309,155 @@ async function crearTablaPoliticaInventarios() {
   
     for (const doc of result2) {
     
+=======
+    //---------------------------------------------------------
+
+    const collection2 = "ui_pol_inv_dias_cobertura";
+    const col1 = db.collection(allPolInvCollectionName);
+    const col2 = db.collection(collection2);
+
+    const result = await col1
+      .aggregate([
+        {
+          $lookup: {
+            from: collection2,
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "joinedData",
+          },
+        },
+        {
+          $unwind: "$joinedData",
+        },
+        {
+          $set: {
+            SS: "$joinedData.SS",
+            Demanda_LT: "$joinedData.Demanda_LT",
+            MOQ: "$joinedData.MOQ",
+            ROQ: "$joinedData.ROQ",
+            ROP: "$joinedData.ROP",
+            META: "$joinedData.META",
+            Inventario_Promedio: "$joinedData.Inventario_Promedio",
+            Vida_Util_Dias: "$joinedData.Vida_Util_Dias",
+            Tolerancia_Vida_Util_Dias: "$joinedData.Tolerancia_Vida_Util_Dias",
+            ROP_Alto: "$joinedData.ROP_Alto",
+            SobreInventario_Dias: "$joinedData.SobreInventario_Dias",
+          },
+        },
+      ])
+      .toArray();
+
+    for (const doc of result) {
+      await col1.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            DC_SS: doc.SS,
+            DC_Demanda_LT: doc.Demanda_LT,
+            DC_MOQ: doc.MOQ,
+            DC_ROQ: doc.ROQ,
+            DC_ROP: doc.ROP,
+            DC_META: doc.META,
+            DC_Inventario_Promedio: doc.Inventario_Promedio,
+            DC_Vida_Util_Dias: doc.Vida_Util_Dias,
+            DC_Tolerancia_Vida_Util_Dias: doc.Tolerancia_Vida_Util_Dias,
+            DC_ROP_Alto: doc.ROP_Alto,
+            DC_SobreInventario_Dias: doc.SobreInventario_Dias,
+          },
+        }
+      );
+    }
+
+    //---------------------------------------------------------
+
+    const collection4 = "ui_pol_inv_pallets";
+    const col3 = db.collection(allPolInvCollectionName);
+    const col4 = db.collection(collection4);
+
+    const result1 = await col3
+      .aggregate([
+        {
+          $lookup: {
+            from: collection4,
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "joinedData",
+          },
+        },
+        {
+          $unwind: "$joinedData",
+        },
+        {
+          $set: {
+            SS: "$joinedData.SS",
+            Demanda_LT: "$joinedData.Demanda_LT",
+            MOQ: "$joinedData.MOQ",
+            ROQ: "$joinedData.ROQ",
+            ROP: "$joinedData.ROP",
+            META: "$joinedData.META",
+            Inventario_Promedio: "$joinedData.Inventario_Promedio",
+          },
+        },
+      ])
+      .toArray();
+
+    for (const doc of result1) {
+      await col3.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            P_SS: doc.SS,
+            P_Demanda_LT: doc.Demanda_LT,
+            P_MOQ: doc.MOQ,
+            P_ROQ: doc.ROQ,
+            P_ROP: doc.ROP,
+            P_META: doc.META,
+            P_Inventario_Promedio: doc.Inventario_Promedio,
+          },
+        }
+      );
+    }
+
+    //---------------------------------------------------------
+
+    const collection6 = "ui_pol_inv_costo";
+    const col5 = db.collection(allPolInvCollectionName);
+    const col6 = db.collection(collection6);
+
+    const result2 = await col5
+      .aggregate([
+        {
+          $lookup: {
+            from: collection6,
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "joinedData",
+          },
+        },
+        {
+          $unwind: "$joinedData",
+        },
+        {
+          $set: {
+            SS: "$joinedData.SS",
+            Demanda_LT: "$joinedData.Demanda_LT",
+            MOQ: "$joinedData.MOQ",
+            ROQ: "$joinedData.ROQ",
+            ROP: "$joinedData.ROP",
+            META: "$joinedData.META",
+            Inventario_Promedio: "$joinedData.Inventario_Promedio",
+          },
+        },
+      ])
+      .toArray();
+
+    for (const doc of result2) {
+>>>>>>> origin/test
       await col5.updateOne(
         { _id: doc._id },
         {
           $set: {
+<<<<<<< HEAD
             C_SS:  doc.SS,
             C_Demanda_LT:  doc.Demanda_LT,
             C_MOQ:  doc.MOQ,
@@ -332,6 +525,68 @@ for (const doc of result3) {
 
 
 
+=======
+            C_SS: doc.SS,
+            C_Demanda_LT: doc.Demanda_LT,
+            C_MOQ: doc.MOQ,
+            C_ROQ: doc.ROQ,
+            C_ROP: doc.ROP,
+            C_META: doc.META,
+            C_Inventario_Promedio: doc.Inventario_Promedio,
+          },
+        }
+      );
+    }
+
+    //---------------------------------------------------------
+    const collection8 = "ui_pol_inv_uom";
+    const col7 = db.collection(allPolInvCollectionName);
+    const col8 = db.collection(collection8);
+
+    const result3 = await col7
+      .aggregate([
+        {
+          $lookup: {
+            from: collection8,
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "joinedData",
+          },
+        },
+        {
+          $unwind: "$joinedData",
+        },
+        {
+          $set: {
+            SS: "$joinedData.SS",
+            Demanda_LT: "$joinedData.Demanda_LT",
+            MOQ: "$joinedData.MOQ",
+            ROQ: "$joinedData.ROQ",
+            ROP: "$joinedData.ROP",
+            META: "$joinedData.META",
+            Inventario_Promedio: "$joinedData.Inventario_Promedio",
+          },
+        },
+      ])
+      .toArray();
+
+    for (const doc of result3) {
+      await col7.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            U_SS: doc.SS,
+            U_Demanda_LT: doc.Demanda_LT,
+            U_MOQ: doc.MOQ,
+            U_ROQ: doc.ROQ,
+            U_ROP: doc.ROP,
+            U_META: doc.META,
+            U_Inventario_Promedio: doc.Inventario_Promedio,
+          },
+        }
+      );
+    }
+>>>>>>> origin/test
 
     writeToLog(`\tTermina la Union de la Tablas de Politicas de Inventario`);
   } catch (err) {
@@ -342,7 +597,11 @@ for (const doc of result3) {
 }
 
 function writeToLog(message) {
+<<<<<<< HEAD
   fs.appendFileSync(logFile, message + '\n');
+=======
+  fs.appendFileSync(logFile, message + "\n");
+>>>>>>> origin/test
 }
 
 crearTablaPoliticaInventarios();

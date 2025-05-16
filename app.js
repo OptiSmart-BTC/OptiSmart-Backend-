@@ -10,8 +10,15 @@ const moment = require('moment-timezone');
 const archiver = require('archiver'); 
 const { Parser } = require('json2csv');
 const logger = require('./logger'); // Importa la configuración de winston
+<<<<<<< HEAD
 
 const cors = require('cors');
+=======
+const axios = require('axios');
+const cors = require('cors');
+const { ObjectId } = require("mongodb"); 
+require('dotenv').config();
+>>>>>>> origin/test
 
 const conex= require('./Configuraciones/ConStrDB');
 const { decryptData } = require('./DeCriptaPassAppDb');
@@ -32,6 +39,25 @@ const rutaDirCargaRequerimientosConfirmados = path.join(directorioActual, 'Carga
 const rutaDirPlanReposicion = path.join(directorioActual, 'PlanReposicion');
 const rutaDirPlanReposicion_Sem = path.join(directorioActual, 'PlanReposicion_Sem');
 
+<<<<<<< HEAD
+=======
+
+
+
+const rutaDirOverridePlanReposicion = path.join(directorioActual, 'OverridePlanReposicion');
+const rutaDirOverridePlanReposicion_Sem = path.join(directorioActual, 'OverridePlanReposicion_Sem');
+const rutaDirPoliticaInventarios = path.join(directorioActual, 'OverridePoliticaInventarios');
+const rutaDirPoliticaInventarios_Sem = path.join(directorioActual, 'OverridePoliticaInventarios_Sem');
+
+const rutaDirPowerBi_PlanReposicion = path.join(directorioActual, 'PowerBi_PlanReposicion');
+const rutaDirPowerBi_PlanReposicion_Sem = path.join(directorioActual, 'PowerBi_PlanReposicion_Sem');
+
+const rutaDirMontecarlo = path.join(
+  directorioActual,
+  "montecarlo"
+);
+
+>>>>>>> origin/test
 // Configuración de conexión a MongoDB
 //const mongoURL = 'mongodb://127.0.0.1:27017';
 //const userDbName = 'opti_users';
@@ -137,7 +163,11 @@ app.post('/login', async (req, res) => {
 
     rutaDirLogFile = `../${conex.getUser()}/log/LogdeCargaCSV.log`;
       
+<<<<<<< HEAD
     const comando = `cd /d "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v2.js ${p_AppUser}`;
+=======
+    const comando = `cd /d "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v3.js ${p_AppUser}`;
+>>>>>>> origin/test
     
     console.log('ruta:'+rutaDirConfiguraCliente);
     console.log('Comando:'+comando);
@@ -251,7 +281,11 @@ app.post('/CargaCSVsku', upload.fields([
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+<<<<<<< HEAD
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+=======
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+>>>>>>> origin/test
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 app.post('/getActualCSVPol', async (req, res) => {
   try {
@@ -417,7 +451,11 @@ app.post('/CargaCSVhist', upload.fields([
   }
 });
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+<<<<<<< HEAD
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+=======
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+>>>>>>> origin/test
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1380,6 +1418,88 @@ app.post('/getCSVPol', async (req, res) => {
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+<<<<<<< HEAD
+=======
+app.post('/getCSVPol1', async (req, res) => {
+  let client;
+
+  try {
+    const { appUser, appPass, DBName, type, cal, subtype } = req.body;
+
+    if (!appUser || !appPass || !DBName || !type || !cal || !subtype) {
+      return res.status(400).json({ error: 'Faltan parámetros en la solicitud.' });
+    }
+
+    console.log(`user: ${appUser}\nDB: ${DBName}\ntype: ${type}\ncal: ${cal}\nsubtype: ${subtype}`);
+    
+    const decryptedAppPass = await decryptData(appPass);
+    
+    client = await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    
+    const userdb = conex.getDB();
+    const db = client.db(userdb);
+
+    // Mapeo de colecciones
+    const collections = {
+      polInv: {
+        Diario: {
+          costo: 'ui_pol_inv_costo',
+          dias_cobertura: 'ui_pol_inv_dias_cobertura',
+          pallets: 'ui_pol_inv_pallets',
+          uom: 'ui_pol_inv_uom'
+        },
+        Semanal: {
+          costo: 'ui_sem_pol_inv_costo',
+          dias_cobertura: 'ui_sem_pol_inv_dias_cobertura',
+          pallets: 'ui_sem_pol_inv_pallets',
+          uom: 'ui_sem_pol_inv_uom'
+        }
+      }
+    };
+
+    const collectionName = collections[type]?.[cal]?.[subtype];
+
+    if (!collectionName) {
+      return res.status(400).json({ error: 'Parámetros inválidos.' });
+    }
+
+    console.log(`Consultando colección: ${collectionName}`);
+
+    const collection = db.collection(collectionName);
+    const data = await collection.find({}).toArray();
+
+    if (!data.length) {
+      return res.status(404).json({ error: 'No se encontraron datos en la colección.' });
+    }
+
+    const csv = parse(data);
+
+    const filePath = path.join(__dirname, 'output.csv');
+    fs.writeFileSync(filePath, csv);
+
+    res.download(filePath, 'datos.csv', (err) => {
+      if (err) {
+        console.error('Error al enviar el archivo:', err);
+        res.status(500).json({ error: 'Error al generar el CSV' });
+      }
+      fs.unlinkSync(filePath);
+    });
+
+  } catch (error) {
+    console.error('Error en /getCSVPol1:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  } finally {
+    if (client) {
+      await client.close();
+    }
+  }
+});
+
+module.exports = app;
+
+
+>>>>>>> origin/test
 // Plan de Reposicion
 app.post('/CargaInvDisponible', upload.fields([{ name: 'doc', maxCount: 1 }]), async (req, res) => {
   try {
@@ -1474,6 +1594,7 @@ app.post('/getActualCSVInvDisp', async (req, res) => {
 
     console.log("conex generado");
 
+<<<<<<< HEAD
     // Ruta donde se guardarán los archivos procesados
     const processedDir = `../${DBName}/csv/in/procesados/`;
 
@@ -1502,6 +1623,46 @@ app.post('/getActualCSVInvDisp', async (req, res) => {
   } catch (error) {
     console.error('Error getting the latest CSV:', error);
     res.status(500).send('Error getting the latest CSV');
+=======
+    // Ruta del directorio donde están los archivos procesados
+    const processedDir = path.resolve(__dirname, `../${DBName}/csv/in/procesados/`);
+
+    // Verificar si el directorio existe
+    if (!fs.existsSync(processedDir)) {
+      return res.status(404).send('El directorio de archivos procesados no existe.');
+    }
+
+    // Obtener los archivos del directorio
+    const files = fs.readdirSync(processedDir);
+
+    if (files.length === 0) {
+      return res.status(404).send('No se encontraron archivos CSV relevantes.');
+    }
+
+    // Crear un archivo ZIP en memoria
+    const zipFileName = 'archivos_procesados.zip';
+    res.attachment(zipFileName);
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    archive.on('error', (err) => {
+      console.error('Error al generar el ZIP:', err);
+      res.status(500).send('Error al generar el archivo ZIP');
+    });
+
+    archive.pipe(res);
+
+    // Agregar archivos al ZIP
+    files.forEach(file => {
+      const filePath = path.join(processedDir, file);
+      archive.file(filePath, { name: file }); // Agregar con el nombre base
+    });
+
+    await archive.finalize(); // Finalizar la compresión
+  } catch (error) {
+    console.error('Error al procesar los archivos CSV:', error);
+    res.status(500).send('Error al procesar los archivos CSV');
+>>>>>>> origin/test
   }
 });
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -1671,16 +1832,41 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
     console.log("Running plan de reposición - Diario");
     const usuarioLog = conex.getUser();
+<<<<<<< HEAD
     const comando = `cd /d "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comando, (error, stdout, stderr) => {
+=======
+    
+    // Comando para ejecutar el Plan de Reposición Diario
+    const comandoPlanReposicion = `cd /d "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
+
+    exec(comandoPlanReposicion, (error, stdout, stderr) => {
+>>>>>>> origin/test
       if (error) {
         console.error('Diario - Error al ejecutar el comando:', error);
         res.status(500).send('Error al ejecutar el comando diario');
         return;
       }
       console.log('Diario - Comando ejecutado con éxito:', stdout);
+<<<<<<< HEAD
       res.sendStatus(200);
+=======
+      
+      // Si el Plan de Reposición se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
+      console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
+      const comandoPowerBI = `cd /d "${rutaDirPowerBi_PlanReposicion}" && node exec_js_Main_PowerBI_PR_process.js ${usuarioLog}`;
+      
+      exec(comandoPowerBI, (error, stdout, stderr) => {
+        if (error) {
+          console.error('PowerBI - Error al ejecutar el comando:', error);
+          res.status(500).send('Error al ejecutar el proceso de PowerBI Plan de Reposición');
+          return;
+        }
+        console.log('PowerBI - Proceso ejecutado con éxito:', stdout);
+        res.sendStatus(200);
+      });
+>>>>>>> origin/test
     });
   } catch (err) {
     console.error('Diario - Error al procesar:', err);
@@ -1688,6 +1874,10 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/test
 // Endpoint para ejecutar el plan de reposición semanal
 app.post('/runPlanReposicionSemanal', async (req, res) => {
   try {
@@ -1697,16 +1887,41 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
     console.log("Running plan de reposición - Semanal");
     const usuarioLog = conex.getUser();
+<<<<<<< HEAD
     const comando = `cd /d "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comando, (error, stdout, stderr) => {
+=======
+
+    // Comando para ejecutar el Plan de Reposición Semanal
+    const comandoPlanReposicionSemanal = `cd /d "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
+
+    exec(comandoPlanReposicionSemanal, (error, stdout, stderr) => {
+>>>>>>> origin/test
       if (error) {
         console.error('Semanal - Error al ejecutar el comando:', error);
         res.status(500).send('Error al ejecutar el comando semanal');
         return;
       }
       console.log('Semanal - Comando ejecutado con éxito:', stdout);
+<<<<<<< HEAD
       res.sendStatus(200);
+=======
+      
+      // Si el Plan de Reposición Semanal se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
+      console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
+      const comandoPowerBI = `cd /d "${rutaDirPowerBi_PlanReposicion_Sem}" && node exec_js_Main_Sem_PowerBI_PR_process.js ${usuarioLog}`;
+      
+      exec(comandoPowerBI, (error, stdout, stderr) => {
+        if (error) {
+          console.error('PowerBI - Error al ejecutar el comando:', error);
+          res.status(500).send('Error al ejecutar el proceso de PowerBI Plan de Reposición');
+          return;
+        }
+        console.log('PowerBI - Proceso ejecutado con éxito:', stdout);
+        res.sendStatus(200);
+      });
+>>>>>>> origin/test
     });
   } catch (err) {
     console.error('Semanal - Error al procesar:', err);
@@ -1714,6 +1929,10 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/test
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1729,6 +1948,10 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
       return res.status(400).send('Faltan parámetros necesarios');
     }
 
+<<<<<<< HEAD
+=======
+    // Corregido: uso de backticks para interpolación de variables
+>>>>>>> origin/test
     console.log(`user: ${appUser}\npass: ${appPass}\nDBName: ${DBName}\ntype: ${type}\ncal: ${cal}`);
     const decryptedAppPass = await decryptData(appPass);
 
@@ -1756,6 +1979,10 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
       return res.status(400).send('Tipo de plan no soportado');
     }
 
+<<<<<<< HEAD
+=======
+    // Corregido: uso de backticks para interpolación de variables
+>>>>>>> origin/test
     console.log(`Fetching data from collection: ${collectionName}`);
     const collection = db.collection(collectionName);
 
@@ -1775,6 +2002,10 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
     const filePath = path.join(__dirname, 'exported_data.csv');
     fs.writeFileSync(filePath, csv);
 
+<<<<<<< HEAD
+=======
+    // Corregido: uso de backticks para interpolación de variables
+>>>>>>> origin/test
     res.download(filePath, `${type}_data.csv`, (err) => {
       if (err) {
         console.error('Error downloading the file:', err);
@@ -1793,6 +2024,167 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+=======
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para ejecutar el override del plan de reposición
+app.post('/runOverridePlanReposicion', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Verificar si overrideValues es válido
+    if (!overrideValues || typeof overrideValues !== 'object' || Object.keys(overrideValues).length === 0) {
+      return res.status(400).send('Valores de override inválidos o vacíos');
+    }
+
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override plan de reposición - Diario");
+    const usuarioLog = conex.getUser();
+
+    // Obtener la conexión a la base de datos una sola vez
+    const client = await conex.connectToDatabase();
+    const db = client.db('btc_opti_' + DBName);
+    const collection = db.collection('plan_reposicion_01'); // Colección de plan de reposición
+
+    // Iterar sobre los valores de override para actualizar por SKU
+    for (const [sku, pallets] of Object.entries(overrideValues)) {
+      console.log(`Actualizando el documento con SKU: ${sku}, con Plan_Firme_Pallets:`, pallets);
+
+      // Actualizar el valor específico dentro de Plan_Firme_Pallets usando el SKU como filtro
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro por el SKU
+        { $set: { 'Plan_Firme_Pallets': pallets } } // Actualización del valor dentro del documento
+      );
+
+      // Verificar si la actualización fue exitosa
+      console.log(`Documentos coincidentes para el SKU: ${sku}`, result.matchedCount);
+      console.log(`Documentos modificados para el SKU: ${sku}`, result.modifiedCount);
+
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para el SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para el SKU: ${sku}`);
+      }
+    }
+
+    console.log(`Actualización completada en plan_reposicion_01`);
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirOverridePlanReposicion}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Diario - Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override diario');
+        return;
+      }
+      console.log('Diario - Comando ejecutado con éxito:', stdout);
+      res.status(200).json({ message: 'Override diario ejecutado con éxito', stdout, stderr });
+    });
+  } catch (err) {
+    console.error('Diario - Error al procesar:', err);
+    res.status(500).json({ message: 'Error al procesar el override plan de reposición diario', error: err });
+  }
+});
+
+
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para ejecutar el override del plan de reposición
+app.post('/runOverridePlanReposicion_Sem', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Verificar si overrideValues es válido
+    if (!overrideValues || typeof overrideValues !== 'object' || Object.keys(overrideValues).length === 0) {
+      return res.status(400).send('Valores de override inválidos o vacíos');
+    }
+
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override plan de reposición - Diario");
+    const usuarioLog = conex.getUser();
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase();
+    const db = client.db('btc_opti_' + DBName);
+    const collection = db.collection('plan_reposicion_01_sem'); // Colección de plan de reposición
+    
+    // Iterar sobre los valores de override y actualizar la colección
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      if (isNaN(overrideValue)) {
+        console.warn(`Valor no numérico para SKU: ${sku}, valor: ${overrideValue}`);
+        continue;  // Saltar a la siguiente iteración si el valor no es un número
+      }
+
+      console.log(`Actualizando SKU: ${sku}, con Plan_Firme_Pallets: ${overrideValue}`);
+
+      // Actualizar el campo Plan_Firme_Pallets
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro para encontrar el SKU correcto
+        { $set: { 'Plan_Firme_Pallets': Number(overrideValue) } } // Actualización
+      );
+
+      // Verificar si la actualización fue exitosa
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para SKU: ${sku}`);
+      }
+
+      console.log(`Actualización completada en plan_reposicion_01_sem para SKU: ${sku}`);
+    }
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirOverridePlanReposicion_Sem}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Diario - Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override diario');
+        return;
+      }
+      console.log('Diario - Comando ejecutado con éxito:', stdout);
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error('Diario - Error al procesar:', err);
+    res.status(500).send('Error al procesar el override plan de reposición diario');
+  }
+});
+
+>>>>>>> origin/test
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1800,9 +2192,1168 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+<<<<<<< HEAD
 // Iniciar el servidor
 const http = require('http');
 const { combinations } = require('mathjs');
+=======
+// Endpoint para ejecutar el override de la política de inventarios
+app.post('/runOverridePoliticaInventarios', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+    
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override politica de Inventarios - Diario");
+    const usuarioLog = conex.getUser();
+
+    // Verificar el contenido de overrideValues para asegurarnos de que esté correcto
+    console.log("overrideValues recibidos:", overrideValues);
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase(); 
+    const db = client.db('btc_opti_' + DBName); 
+    const collection = db.collection('politica_inventarios_01'); // Colección de políticas de inventario
+    
+    // Iterar sobre los valores de override y actualizar la colección
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      console.log(`Actualizando SKU: ${sku}, con Override_SS_Cantidad: ${overrideValue}`);
+      
+      // Actualizar el campo Override_SS_Cantidad en la colección y obtener el resultado
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro para encontrar el SKU correcto
+        //{ $set: { 'SS_Cantidad': Number(overrideValue) } }
+        { $set: { 'Override_SS_Cantidad': Number(overrideValue) } } 
+      );
+
+      // Verificar si la actualización fue exitosa
+      console.log(`Documentos coincidentes para SKU: ${sku}:`, result.matchedCount);
+      console.log(`Documentos modificados para SKU: ${sku}:`, result.modifiedCount);
+      
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para SKU: ${sku}`);
+      }
+
+      console.log(`Actualización completada en politica_inventarios_01 para SKU: ${sku}`);
+    }
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override diario');
+        return;
+      }
+      console.log('Salida estándar (stdout):', stdout);
+      console.log('Errores estándar (stderr):', stderr);
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error('Diario - Error al procesar:', err);
+    res.status(500).send('Error al procesar el override politica de inventario diario');
+  }
+});
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para ejecutar el override de la política de inventarios semanal
+app.post('/runOverridePoliticaInventarios_Sem', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+    
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override politica de Inventarios - Semanal");
+    const usuarioLog = conex.getUser();
+
+    // Verificar el contenido de overrideValues para asegurarnos de que esté correcto
+    console.log("overrideValues recibidos:", overrideValues);
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase(); 
+    const db = client.db('btc_opti_' + DBName); 
+
+    const collection = db.collection('politica_inventarios_01_sem'); // Colección de políticas de inventario
+    
+    // Iterar sobre los valores de override y actualizar la colección
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      console.log(`Actualizando SKU: ${sku}, con Override_SS_Cantidad: ${overrideValue}`);
+      
+      // Actualizar el campo Override_SS_Cantidad en la colección y obtener el resultado
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro para encontrar el SKU correcto
+        //{ $set: { 'SS_Cantidad': Number(overrideValue) } },
+        { $set: { 'Override_SS_Cantidad': Number(overrideValue) } } 
+      );
+
+      // Verificar si la actualización fue exitosa
+      console.log(`Documentos coincidentes para SKU: ${sku}:`, result.matchedCount);
+      console.log(`Documentos modificados para SKU: ${sku}:`, result.modifiedCount);
+      
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para SKU: ${sku}`);
+      }
+
+      console.log(`Actualización completada en politica_inventarios_01_sem para SKU: ${sku}`);
+    }
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override semanal');
+        return;
+      }
+      console.log('Salida estándar (stdout):', stdout);
+      console.log('Errores estándar (stderr):', stderr);
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error('Semanal - Error al procesar:', err);
+    res.status(500).send('Error al procesar el override politica de inventario semanal');
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+const { spawn } = require('child_process');
+
+
+
+app.post('/applyGeneralOverride', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues, tipoProceso } = req.body;
+
+    // Validar que tipoProceso sea válido
+    if (!['Diario', 'Semanal'].includes(tipoProceso)) {
+      return res.status(400).send('Tipo de proceso no soportado. Use "Diario" o "Semanal".');
+    }
+
+    // Validar overrideValues
+    if (!overrideValues || typeof overrideValues !== 'object' || Object.keys(overrideValues).length === 0) {
+      return res.status(400).send('Datos de override inválidos o vacíos.');
+    }
+
+    for (const [sku, value] of Object.entries(overrideValues)) {
+      if (!sku) {
+        return res.status(400).send(`SKU inválido: "${sku}"`);
+      }
+      if (isNaN(value)) {
+        return res.status(400).send(`El valor para el SKU ${sku} no es un número válido.`);
+      }
+    }
+
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    const usuarioLog = conex.getUser();
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase();
+    const db = client.db('btc_opti_' + DBName);
+
+    // Seleccionar la colección según tipoProceso
+    let collection;
+    if (tipoProceso === 'Diario') {
+      collection = db.collection('politica_inventarios_01');
+    } else if (tipoProceso === 'Semanal') {
+      collection = db.collection('politica_inventarios_01_sem');
+    }
+
+    const resultados = [];
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      try {
+        console.log(`Procesando SKU: ${sku}, valor de ajuste: ${overrideValue}`);
+    
+        const currentDoc = await collection.findOne({ SKU: sku });
+        if (!currentDoc) {
+          console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+          continue;
+        }
+    
+        const baseValue = currentDoc.SS_Cantidad ?? 0; // Valor base del sistema
+        const currentOverride = currentDoc.Override_SS_Cantidad ?? baseValue; // Usa baseValue si no hay override
+        const newOverride = currentOverride + Number(overrideValue); // Aplica suma o resta según el valor
+    
+        // Actualizar el valor acumulado
+        await collection.updateOne(
+          { SKU: sku },
+          { $set: { Override_SS_Cantidad: newOverride } }
+        );
+    
+        resultados.push({
+          sku,
+          valorBase: baseValue,
+          ajuste: overrideValue,
+          valorFinal: newOverride,
+        });
+    
+        console.log(`Nuevo valor para SKU ${sku}: ${newOverride}`);
+      } catch (dbError) {
+        console.error(`Error procesando SKU ${sku}:`, dbError);
+      }
+    }
+    
+    // Crear un archivo temporal para los datos de override
+    const tempFilePath = path.join(__dirname, 'override_values_temp.json');
+    fs.writeFileSync(tempFilePath, JSON.stringify(overrideValues));
+
+    // Preparar el comando según tipoProceso
+    let comando;
+    if (tipoProceso === 'Diario') {
+      comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+    } else if (tipoProceso === 'Semanal') {
+      comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+    }
+
+    exec(comando, (error, stdout, stderr) => {
+      try {
+        fs.unlinkSync(tempFilePath); // Limpieza del archivo temporal
+      } catch (unlinkError) {
+        console.error('Error al eliminar el archivo temporal:', unlinkError);
+      }
+
+      if (error) {
+        console.error('Error al ejecutar el comando:', stderr);
+        return res.status(500).send(`Error al ejecutar el general override: ${stderr}`);
+      }
+
+      console.log('Salida estándar (stdout):', stdout);
+      res.status(200).json({ mensaje: 'General override aplicado correctamente', resultados });
+    });
+  } catch (err) {
+    console.error('General Override - Error al procesar:', err);
+    res.status(500).send('Error al procesar el general override');
+  }
+});
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.post('/runOverridePoliticaInventarios_ROP', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+    
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override politica de Inventarios - Diario");
+    const usuarioLog = conex.getUser();
+
+    // Verificar el contenido de overrideValues para asegurarnos de que esté correcto
+    console.log("overrideValues recibidos:", overrideValues);
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase(); 
+    const db = client.db('btc_opti_' + DBName); 
+    const collection = db.collection('politica_inventarios_01'); // Colección de políticas de inventario
+    
+    // Iterar sobre los valores de override y actualizar la colección
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      console.log(`Actualizando SKU: ${sku}, con Override_ROP: ${overrideValue}`);
+      
+      // Actualizar el campo Override_SS_Cantidad en la colección y obtener el resultado
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro para encontrar el SKU correcto
+        //{ $set: { 'SS_Cantidad': Number(overrideValue) } }
+        { $set: { 'Override_ROP': Number(overrideValue) } } 
+      );
+
+      // Verificar si la actualización fue exitosa
+      console.log(`Documentos coincidentes para SKU: ${sku}:`, result.matchedCount);
+      console.log(`Documentos modificados para SKU: ${sku}:`, result.modifiedCount);
+      
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para SKU: ${sku}`);
+      }
+
+      console.log(`Actualización completada en politica_inventarios_01 para SKU: ${sku}`);
+    }
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override diario');
+        return;
+      }
+      console.log('Salida estándar (stdout):', stdout);
+      console.log('Errores estándar (stderr):', stderr);
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error('Diario - Error al procesar:', err);
+    res.status(500).send('Error al procesar el override ROP diario');
+  }
+});
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+app.post('/runOverridePoliticaInventarios_ROP_Sem', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues } = req.body;
+    
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+    
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    console.log("Running Override politica de Inventarios - Semanal");
+    const usuarioLog = conex.getUser();
+
+    // Verificar el contenido de overrideValues para asegurarnos de que esté correcto
+    console.log("overrideValues recibidos:", overrideValues);
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase(); 
+    const db = client.db('btc_opti_' + DBName); 
+
+    const collection = db.collection('politica_inventarios_01_sem'); // Colección de políticas de inventario
+    
+    // Iterar sobre los valores de override y actualizar la colección
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      console.log(`Actualizando SKU: ${sku}, con Override_ROP: ${overrideValue}`);
+      
+      // Actualizar el campo Override_ROP en la colección y obtener el resultado
+      const result = await collection.updateOne(
+        { SKU: sku }, // Filtro para encontrar el SKU correcto
+        //{ $set: { 'SS_Cantidad': Number(overrideValue) } },
+        { $set: { 'Override_ROP': Number(overrideValue) } } 
+      );
+
+      // Verificar si la actualización fue exitosa
+      console.log(`Documentos coincidentes para SKU: ${sku}:`, result.matchedCount);
+      console.log(`Documentos modificados para SKU: ${sku}:`, result.modifiedCount);
+      
+      if (result.matchedCount === 0) {
+        console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+      }
+
+      if (result.modifiedCount === 0) {
+        console.warn(`Advertencia: No se modificó ningún documento para SKU: ${sku}`);
+      }
+
+      console.log(`Actualización completada en politica_inventarios_01_sem para SKU: ${sku}`);
+    }
+
+    // Preparar el comando para ejecutar el proceso de override
+    const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
+    const comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+
+    // Ejecutar el comando
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error al ejecutar el comando:', error);
+        res.status(500).send('Error al ejecutar el override semanal');
+        return;
+      }
+      console.log('Salida estándar (stdout):', stdout);
+      console.log('Errores estándar (stderr):', stderr);
+      res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error('Semanal - Error al procesar:', err);
+    res.status(500).send('Error al procesar el override rROP semanal');
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+app.post('/applyGeneralOverride_ROP', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, overrideValues, tipoProceso } = req.body;
+
+    // Validación inicial de datos
+    if (!appUser || !appPass || !DBName || !tipoProceso || !overrideValues) {
+      return res.status(400).send('Faltan parámetros obligatorios');
+    }
+
+    if (!['Diario', 'Semanal'].includes(tipoProceso)) {
+      return res.status(400).send('Tipo de proceso no soportado. Use "Diario" o "Semanal".');
+    }
+
+    if (!overrideValues || typeof overrideValues !== 'object' || Object.keys(overrideValues).length === 0) {
+      return res.status(400).send('Datos de override inválidos o vacíos.');
+    }
+
+    for (const [sku, value] of Object.entries(overrideValues)) {
+      if (!sku) {
+        return res.status(400).send(`SKU inválido: "${sku}"`);
+      }
+      if (isNaN(value)) {
+        return res.status(400).send(`El valor para el SKU ${sku} no es un número válido.`);
+      }
+    }
+
+    // Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    const usuarioLog = conex.getUser();
+
+    // Obtener la conexión a la base de datos
+    const client = await conex.connectToDatabase();
+    const db = client.db('btc_opti_' + DBName);
+
+    // Seleccionar la colección según tipoProceso
+    let collection;
+    if (tipoProceso === 'Diario') {
+      collection = db.collection('politica_inventarios_01');
+    } else if (tipoProceso === 'Semanal') {
+      collection = db.collection('politica_inventarios_01_sem');
+    }
+
+    const resultados = [];
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      try {
+        console.log(`Procesando SKU: ${sku}, valor de ajuste ROP: ${overrideValue}`);
+
+        const currentDoc = await collection.findOne({ SKU: sku });
+        if (!currentDoc) {
+          console.warn(`Advertencia: No se encontró ningún documento para SKU: ${sku}`);
+          continue;
+        }
+
+        // Inicialización correcta y acumulación del Override
+        const baseValue = currentDoc.ROP ?? 0; // Valor base del sistema
+        const currentOverride = currentDoc.Override_ROP ?? baseValue; // Usa baseValue si no hay override previo
+        const newOverride = currentOverride + Number(overrideValue); // Aplica suma o resta según el valor
+
+        // Actualizar el valor acumulado
+        await collection.updateOne(
+          { SKU: sku },
+          { $set: { Override_ROP: newOverride } }
+        );
+
+        resultados.push({
+          sku,
+          valorBase: baseValue,
+          ajuste: overrideValue,
+          valorFinal: newOverride,
+        });
+
+        console.log(`Nuevo valor ROP para SKU ${sku}: ${newOverride}`);
+      } catch (dbError) {
+        console.error(`Error procesando SKU ${sku}:`, dbError);
+      }
+    }
+
+    // Crear un archivo temporal para los datos de override
+    const tempFilePath = path.join(__dirname, 'override_rop_temp.json');
+    fs.writeFileSync(tempFilePath, JSON.stringify(overrideValues));
+
+    // Preparar el comando según tipoProceso
+    let comando;
+    if (tipoProceso === 'Diario') {
+      comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+    } else if (tipoProceso === 'Semanal') {
+      comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+    }
+
+    exec(comando, (error, stdout, stderr) => {
+      try {
+        fs.unlinkSync(tempFilePath); // Limpieza del archivo temporal
+      } catch (unlinkError) {
+        console.error('Error al eliminar el archivo temporal:', unlinkError);
+      }
+
+      if (error) {
+        console.error('Error al ejecutar el comando:', error.message);
+        return res.status(500).send('Error al ejecutar el comando.');
+      }
+
+      console.log('Comando ejecutado exitosamente:', stdout);
+      res.status(200).send({ resultados, mensaje: 'Override ROP aplicado con éxito' });
+    });
+  } catch (err) {
+    console.error('Error al aplicar override ROP:', err);
+    res.status(500).send('Error al aplicar override ROP.');
+  }
+});
+
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+// Endpoint para crear el backup inicial de los datos
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+// Endpoint para restaurar los valores originales desde el backup
+app.post('/revertGeneralOverride', async (req, res) => {
+  let client;
+  try {
+    const { appUser, appPass, DBName, tipoProceso } = req.body;
+
+    // Validar el tipo de proceso
+    if (!['Diario', 'Semanal'].includes(tipoProceso)) {
+      return res.status(400).send('Tipo de proceso no soportado. Use "Diario" o "Semanal".');
+    }
+
+    // Desencriptar la contraseña y conectar a la base de datos
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+    client = await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    const db = client.db('btc_opti_' + DBName);
+
+    // Definir nombres de las colecciones según el tipo de proceso
+    const collections = [
+      {
+        source: tipoProceso === 'Diario' ? 'ui_all_pol_inv_backup' : 'ui_sem_all_pol_inv_backup',
+        target: tipoProceso === 'Diario' ? 'ui_all_pol_inv' : 'ui_sem_all_pol_inv',
+      },
+      {
+        target: tipoProceso === 'Diario' ? 'politica_inventarios_01' : 'politica_inventarios_01_sem',
+        source: tipoProceso === 'Diario' ? 'politica_inventarios_01_backup' : 'politica_inventarios_01_sem_backup',
+      },
+    ];
+
+    for (const { source, target } of collections) {
+      const sourceCollection = db.collection(source);
+      const targetCollection = db.collection(target);
+
+      // Recuperar documentos del backup o de la fuente original
+      const documents = await sourceCollection.find().toArray();
+
+      if (documents.length === 0) {
+        console.log(`No se encontraron documentos en la colección ${source}.`);
+        continue; // Saltar a la siguiente colección
+      }
+
+      console.log(`Procesando ${documents.length} documentos desde ${source} hacia ${target}.`);
+
+      // Limpiar la colección destino y restaurar documentos
+      await targetCollection.deleteMany({});
+      const result = await targetCollection.insertMany(documents.map(({ _id, ...doc }) => doc));
+
+      console.log(`Se copiaron ${result.insertedCount} documentos a la colección destino (${target}).`);
+    }
+
+    res.status(200).send('Las colecciones han sido procesadas correctamente.');
+  } catch (err) {
+    console.error('Error al procesar las colecciones:', err);
+    res.status(500).send('Error al procesar las colecciones.');
+  } finally {
+    if (client) await client.close(); // Cerrar la conexión a la base de datos
+  }
+});
+
+
+
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+const { URLSearchParams } = require('url');
+
+app.post('/getPowerBIEmbedToken', async (req, res) => {
+  
+    try {
+        // Verifica si las variables de entorno necesarias están configuradas
+        if (!process.env.TENANT_ID || !process.env.CLIENT_ID || !process.env.CLIENT_SECRET || !process.env.GROUP_ID || !process.env.REPORT_ID) {
+            console.error('Error: Faltan una o más variables de entorno necesarias.');
+            return res.status(500).json({ message: 'Configuración del servidor incompleta. Por favor, verifica las variables de entorno.' });
+        }
+
+        // Paso 1: Obtener el token de acceso desde Azure
+        const authResponse = await axios.post(
+            `https://login.microsoftonline.com/${process.env.TENANT_ID}/oauth2/v2.0/token`,
+            new URLSearchParams({
+                client_id: process.env.CLIENT_ID,
+                client_secret: process.env.CLIENT_SECRET,
+                scope: 'https://analysis.windows.net/powerbi/api/.default',
+                grant_type: 'client_credentials'
+            }),
+            { timeout: 10000 } // 10 segundos de tiempo de espera
+        );
+
+        const accessToken = authResponse.data.access_token;
+        console.log("Access Token:", accessToken);
+
+        // Prueba de acceso a las áreas de trabajo con el Access Token
+        const workspaceResponse = await axios.get(
+            'https://api.powerbi.com/v1.0/myorg/groups',
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                },
+                timeout: 10000
+            }
+        );
+        console.log("Workspaces:", workspaceResponse.data);
+
+        // Paso 2: Obtener el token de incrustación para el reporte de Power BI
+        const embedResponse = await axios.post(
+            `https://api.powerbi.com/v1.0/myorg/groups/${process.env.GROUP_ID}/reports/${process.env.REPORT_ID}/GenerateToken`,
+            { accessLevel: 'View' },
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000 // 10 segundos de tiempo de espera
+            }
+        );
+
+        // Enviar el token de incrustación al cliente
+        res.status(200).json({
+            embedToken: embedResponse.data.token,
+            embedUrl: embedResponse.data.embedUrl,
+            reportId: process.env.REPORT_ID
+        });
+    } catch (error) {
+        if (error.response) {
+            console.error('Embed Token Error Response:', JSON.stringify(error.response.data, null, 2));
+            res.status(500).json({
+                message: 'Error en la solicitud a Power BI',
+                status: error.response.status,
+                headers: error.response.headers,
+                data: error.response.data,
+                config: error.config // Muestra la configuración de la solicitud
+            });
+        } else if (error.request) {
+            console.error('No hubo respuesta de la API:', error.message);
+            res.status(500).json({ message: 'No hubo respuesta de la API de Power BI. Verifica la conexión de red.' });
+        } else {
+            console.error('Error al configurar la solicitud:', error.message);
+            res.status(500).json({ message: 'Error al configurar la solicitud a la API de Power BI' });
+        }
+    }
+});
+
+
+
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+app.post('/getPwBiUrl', async (req, res) => {
+  try {
+    // Obtenemos las credenciales desde el cuerpo de la solicitud
+    const { appUser, appPass, DBName } = req.body;
+    console.log('Datos recibidos:', { appUser, DBName });
+
+    // Definimos la ruta al archivo `pwbiuservars.js` en `C:\\users\`
+    const pwbiFilePath = path.join('C:\\', appUser, 'users', appUser, 'cfg', 'pwbiuservars.js');
+
+
+    // Verificamos si el archivo existe
+    if (!fs.existsSync(pwbiFilePath)) {
+      console.log(`El archivo ${pwbiFilePath} no existe.`);
+      return res.status(404).json({ error: 'Archivo de configuración de Power BI no encontrado para el usuario.' });
+    }
+
+    // Importamos el archivo y obtenemos los datos de Power BI
+    const { PwBiUser, PwBiPassword, PwBiURL } = require(pwbiFilePath);
+    console.log('Datos de Power BI leídos desde el archivo:', { PwBiUser, PwBiPassword, PwBiURL });
+
+    // Enviamos la URL de Power BI en la respuesta
+    res.json({ url: PwBiURL });
+  } catch (error) {
+    console.error('Error al obtener URL de Power BI:', error);
+    res.status(500).json({ error: 'Error interno al obtener URL de Power BI' });
+  }
+});
+
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+app.post("/runMontecarloAndOverride", async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, tipoProceso } = req.body;
+
+    if (!tipoProceso) {
+      return res
+        .status(400)
+        .send('Debe especificar el tipo de proceso: "Diario" o "Semanal".');
+    }
+
+    console.log("Inicio del proceso con:", { appUser, DBName, tipoProceso });
+
+    // 1. Desencriptar la contraseña
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // 2. Conectar a la base de datos y establecer los datos del usuario
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, "btc_opti_" + DBName);
+
+    const client = await conex.connectToDatabase();
+    const db = client.db("btc_opti_" + DBName);
+
+    // 3. Determinar la colección según el tipo de proceso
+    const collectionName =
+      tipoProceso === "Diario"
+        ? "politica_inventarios_montecarlo"
+        : "politica_inventarios_montecarlo_sem";
+
+    const collection = db.collection(collectionName);
+
+    const usuarioLog = conex.getUser();
+
+    // Función para ejecutar un proceso externo
+    const ejecutarProceso = (comando) =>
+      new Promise((resolve, reject) => {
+        const proceso = spawn(comando, {
+          shell: true,
+        });
+
+        proceso.stdout.on("data", (data) => console.log(`stdout: ${data}`));
+        proceso.stderr.on("data", (data) => console.error(`stderr: ${data}`));
+        proceso.on("close", (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Proceso terminó con código de error: ${code}`));
+          }
+        });
+      });
+
+    // 4. Ejecutar Monte Carlo
+    console.log("Ejecutando Monte Carlo...");
+    const comandoMontecarlo = `cd /d "${rutaDirMontecarlo}" && node exec_js_montecarlo.js ${appUser} ${tipoProceso}`;
+    await ejecutarProceso(comandoMontecarlo);
+    console.log("Monte Carlo ejecutado con éxito.");
+
+    // 5. Leer los SKUs y valores de override desde la colección
+    console.log("Extrayendo datos de la colección para el override...");
+    const skuData = await collection.find({}).toArray();
+
+    if (!skuData.length) {
+      return res
+        .status(404)
+        .send("No se encontraron datos en la colección seleccionada.");
+    }
+
+    const overrideValues = {};
+    skuData.forEach((doc) => {
+      if (doc.SKU && doc.SS_cantidad != null) {
+        overrideValues[doc.SKU] = doc.SS_cantidad;
+      }
+    });
+
+    console.log("Datos de override obtenidos de la colección:", overrideValues);
+
+    // 6. Actualizar la misma colección con los valores extraídos
+    for (const [sku, overrideValue] of Object.entries(overrideValues)) {
+      console.log(`Procesando SKU: ${sku}, OverrideValue: ${overrideValue}`);
+      const result = await collection.updateOne(
+        { SKU: sku },
+        { $set: { Override_SS_Cantidad: Number(overrideValue) } }
+      );
+
+      console.log(
+        `Documentos actualizados para SKU ${sku}:`,
+        result.modifiedCount
+      );
+
+      if (result.matchedCount === 0) {
+        console.warn(
+          `Advertencia: No se encontró ningún documento para SKU: ${sku}`
+        );
+      }
+    }
+
+    // 7. Ejecutar el script externo del Override
+    console.log("Ejecutando Override...");
+    const comandoOverride =
+      tipoProceso === "Diario"
+        ? `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog}`
+        : `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog}`;
+    await ejecutarProceso(comandoOverride);
+    console.log("Override ejecutado con éxito.");
+
+    res.send({
+      message: "Procesos de Monte Carlo y Override completados con éxito.",
+    });
+  } catch (error) {
+    console.error("Error en el endpoint:", error);
+    res.status(500).send({ error: "Error ejecutando los procesos." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Get all roles
+app.get("/api/roles", async (req, res) => {
+  try {
+    const client = await conex.connectToDatabase(); // Use your existing database connection logic
+    const db = client.db(adminDbName); // Use the `adminDbName` variable defined in your code
+    const roles = await db.collection("roles").find().toArray();
+    res.status(200).json(roles);
+  } catch (err) {
+    console.error("Error fetching roles:", err);
+    res.status(500).json({ error: "Error fetching roles." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Add a new role
+app.post("/api/roles", async (req, res) => {
+  const { name, description, permissions } = req.body;
+
+  if (!name || !description || !Array.isArray(permissions)) {
+    return res
+      .status(400)
+      .json({ error: "Invalid request. Check your inputs." });
+  }
+
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+    const newRole = { name, description, permissions };
+
+    const result = await db.collection("roles").insertOne(newRole);
+
+    if (!result.insertedId) {
+      return res.status(500).json({ error: "Failed to insert the role." });
+    }
+
+    res.status(201).json({ _id: result.insertedId, ...newRole }); // Return the created role with its ID
+  } catch (err) {
+    console.error("Error adding new role:", err);
+    res.status(500).json({ error: "Error adding new role." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Update an existing role
+app.put("/api/roles/:id", async (req, res) => {
+  const roleId = req.params.id;
+  const { permissions } = req.body;
+
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+    const result = await db
+      .collection("roles")
+      .updateOne({ _id: new ObjectId(roleId) }, { $set: { permissions } });
+
+    if (result.modifiedCount === 0) {
+      return res
+        .status(404)
+        .json({ error: "Role not found or no changes made." });
+    }
+
+    res.status(200).json({ message: "Permissions updated successfully." });
+  } catch (err) {
+    console.error("Error updating permissions:", err);
+    res.status(500).json({ error: "Error updating permissions." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Delete a role
+app.delete("/api/roles/:id", async (req, res) => {
+  const roleId = req.params.id;
+
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+    const result = await db
+      .collection("roles")
+      .deleteOne({ _id: new MongoClient.ObjectID(roleId) });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Role not found." });
+    }
+
+    res.status(200).json({ message: "Role deleted successfully." });
+  } catch (err) {
+    console.error("Error deleting role:", err);
+    res.status(500).json({ error: "Error deleting role." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get("/api/permissions", (req, res) => {
+  try {
+    // Resolve the path to the JSON file
+    const filePath = "C:/OptiBack/multiusuario/permissions.json";
+
+    // Read the JSON file synchronously (or use async if needed)
+    const data = fs.readFileSync(filePath, "utf8");
+
+    // Parse the JSON content
+    const permissions = JSON.parse(data);
+
+    // Send the parsed permissions
+    res.status(200).json(permissions);
+  } catch (err) {
+    console.error("Error fetching permissions:", err);
+    res.status(500).json({ error: "Error fetching permissions." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Fetch all roles
+app.get("/api/roles", async (req, res) => {
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+
+    const roles = await db.collection("roles").find({}).toArray();
+
+    res.status(200).json(roles); // Send the list of roles
+  } catch (err) {
+    console.error("Error fetching roles:", err);
+    res.status(500).json({ error: "Error fetching roles." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get("/api/users", async (req, res) => {
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+    const users = await db.collection("usuarios").find().toArray();
+    res.status(200).json(users);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).json({ error: "Error fetching users." });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Update a user's role
+app.put("/api/users/:appUser", async (req, res) => {
+  const appUser = req.params.appUser; // The AppUser (e.g., 'multi', 'Miguel')
+  const { rol } = req.body; // The new role
+
+  if (!rol) {
+    return res.status(400).json({ error: "Role is required." });
+  }
+
+  try {
+    const client = await conex.connectToDatabase();
+    const db = client.db(adminDbName);
+
+    // Update the correct UserUI object in the users collection
+    const result = await db.collection("usuarios").updateOne(
+      { "UserUI.AppUser": appUser }, // Find the document with the matching AppUser
+      { $set: { "UserUI.$.rol": rol } } // Update the 'rol' field of the matched UserUI array element
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    res.status(200).json({ message: "Role updated successfully." });
+  } catch (err) {
+    console.error("Error updating user role:", err);
+    res.status(500).json({ error: "Internal server error." });
+  }
+});
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.post("/api/create-user", (req, res) => {
+  console.log("Received API request:", req.body);
+
+  const {
+    AppUser,
+    AppPassword,
+    UserName,
+    UserTitle,
+    CompanyName,
+    DBName,
+    DBUser,
+    DBPassword,
+  } = req.body;
+
+  const scriptDir = "C:/1.-AdminTool/1.-AdminTool"; // Directory containing the script
+  const scriptFile = "UsuarioPri_Nuevo_v3.js"; // Script name
+
+  // Construct command
+  const command = `node ${scriptFile} "${AppUser}" "${AppPassword}" "${UserName}" "${UserTitle}" "${CompanyName}" "${DBName}" "${DBUser}" "${DBPassword}"`;
+
+  console.log(`Executing command in ${scriptDir}: ${command}`);
+
+  // Run the script with the correct working directory
+  const child = exec(command, { cwd: scriptDir, timeout: 60000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error("Error executing script:", error);
+      return res
+        .status(500)
+        .json({ message: "Error running script", error: error.message });
+    }
+
+    if (stderr) {
+      console.error("Script stderr:", stderr);
+      return res.status(500).json({ message: "Script error", error: stderr });
+    }
+
+    console.log("Script executed successfully:", stdout);
+    res
+      .status(200)
+      .json({ message: "User created successfully", output: stdout });
+  });
+
+  child.on("exit", (code) => {
+    console.log(`Child process exited with code ${code}`);
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+// Iniciar el servidor
+const http = require('http');
+>>>>>>> origin/test
 
 // Elimina todas las referencias a SSL y HTTPS
 // const https = require('https');
@@ -1840,6 +3391,7 @@ async function getDecryptedPassUser(p_AppPass) {
     throw error;
   }
 }
+<<<<<<< HEAD
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -2434,3 +3986,5 @@ app.get('/logs', async (req, res) => {
     });
   }
 });
+=======
+>>>>>>> origin/test

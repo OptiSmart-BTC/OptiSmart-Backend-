@@ -84,7 +84,12 @@ async function crearTablaPoliticaInventarios() {
         Inventario_Promedio: 0,
         Medida_Override: "",
         Tipo_Override: "",
+<<<<<<< HEAD
         STAT_SS: ""
+=======
+        STAT_SS: "",
+        Override_SS_Cantidad: 0,
+>>>>>>> origin/test
       };
     });
 

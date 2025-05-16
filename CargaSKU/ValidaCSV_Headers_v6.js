@@ -20,6 +20,10 @@ const encabezadosRequeridos = [
 'Segmentacion_Producto',
 'Ubicacion',
 'Desc_Ubicacion',
+<<<<<<< HEAD
+=======
+'Origen_Abasto',
+>>>>>>> origin/test
 'OverrideClasificacionABCD',
 'Override_Min_Politica_Inventarios',
 'Override_Max_Politica_Inventarios',
@@ -38,7 +42,13 @@ const encabezadosRequeridos = [
 'Unidad_Medida_UOM',
 'Presentacion',
 'Desc_Empaque_UOM_Base',
+<<<<<<< HEAD
 'Unidades_Empaque'
+=======
+'Unidades_Empaque',
+'Cantidad_Demanda_Indirecta',
+'Nivel_OA'
+>>>>>>> origin/test
 ]; 
 
 

@@ -1,22 +1,38 @@
+<<<<<<< HEAD
 const fs = require('fs'); 
 const MongoClient = require('mongodb').MongoClient;
 const conex= require('../Configuraciones/ConStrDB');
 const moment = require('moment');
 
 const { host, puerto} = require('../Configuraciones/ConexionDB');
+=======
+const fs = require("fs");
+const MongoClient = require("mongodb").MongoClient;
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
+
+const { host, puerto } = require("../Configuraciones/ConexionDB");
+>>>>>>> origin/test
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
+<<<<<<< HEAD
 
 //const uri = `mongodb://${host}:${puerto}/${dbName}`;
 //const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
 const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
 
+=======
+const collectionName = process.argv.slice(2)[3] || "politica_inventarios_01";
+
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
+>>>>>>> origin/test
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
+<<<<<<< HEAD
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`; 
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
@@ -60,6 +76,41 @@ async function calcularCosto() {
       const costounidad = inventario.skuData.Costo_Unidad;
       return {
         Tipo_Calendario:"Dia",
+=======
+const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
+
+async function calcularCosto() {
+  writeToLog(`\nPaso 19 - Transforamación de datos de salida a Costo`);
+  let client;
+
+  try {
+    client = await MongoClient.connect(mongoUri);
+    const db = client.db(dbName);
+
+    const inventarios01Collection = db.collection(collectionName);
+    const skuCollection = db.collection("sku");
+
+    const joinResult = await inventarios01Collection
+      .aggregate([
+        {
+          $lookup: {
+            from: "sku",
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "skuData",
+          },
+        },
+        { $unwind: "$skuData" },
+        { $sort: { Ubicacion: 1, Producto: 1 } },
+      ])
+      .toArray();
+
+    const Costo = joinResult.map((inventario) => {
+      const costounidad = inventario.skuData.Costo_Unidad || 0;
+      return {
+        Tipo_Calendario: "Dia",
+>>>>>>> origin/test
         SKU: inventario.SKU,
         Producto: inventario.Producto,
         Desc_Producto: inventario.Desc_Producto,
@@ -75,6 +126,7 @@ async function calcularCosto() {
         ROQ: inventario.ROQ * costounidad,
         ROP: inventario.ROP * costounidad,
         META: inventario.META * costounidad,
+<<<<<<< HEAD
         Inventario_Promedio: inventario.Inventario_Promedio * costounidad
       };
     });
@@ -92,12 +144,32 @@ async function calcularCosto() {
     //console.error('Ocurrió un error:', error);
     writeToLog(`${now} - [ERROR] ${error.message}`);
     client.close();
+=======
+        Inventario_Promedio: inventario.Inventario_Promedio * costounidad,
+      };
+    });
+
+    const CostoCollection = db.collection("politica_inventarios_costo");
+    await CostoCollection.insertMany(Costo);
+
+    writeToLog(`\tTermina la Transforamación de datos de salida a Costo`);
+  } catch (error) {
+    writeToLog(`${now} - [ERROR] ${error.message}`);
+  } finally {
+    if (client) await client.close(); // ✅ Siempre cerrar la conexión
+>>>>>>> origin/test
   }
 }
 
 function writeToLog(message) {
+<<<<<<< HEAD
   fs.appendFileSync(logFile, message + '\n');
 }
 
 // Ejecutar la función principal
+=======
+  fs.appendFileSync(logFile, message + "\n");
+}
+
+>>>>>>> origin/test
 calcularCosto();
