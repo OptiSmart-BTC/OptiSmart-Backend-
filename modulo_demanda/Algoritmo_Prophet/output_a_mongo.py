@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 import pandas as pd
 import sys
+import os
 
 
 def obtener_datos_desde_mongo(mongo_uri, db_name, collection_name):
@@ -83,6 +84,10 @@ def main(db_name, collection_name, mongo_uri, min_registros, max_porcentaje_cero
    
 
 if __name__ == '__main__':
+    script_dir = os.path.dirname(__file__)
+    log_path = os.path.join(script_dir, 'prophet_python.log')
+    sys.stdout = open(log_path, 'w')
+    sys.stderr = sys.stdout
     mongo_uri = sys.argv[3]
     db_name = sys.argv[1]
     collection_name = sys.argv[2]

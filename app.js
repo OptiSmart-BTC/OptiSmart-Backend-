@@ -10,15 +10,10 @@ const moment = require('moment-timezone');
 const archiver = require('archiver'); 
 const { Parser } = require('json2csv');
 const logger = require('./logger'); // Importa la configuración de winston
-<<<<<<< HEAD
-
-const cors = require('cors');
-=======
 const axios = require('axios');
 const cors = require('cors');
 const { ObjectId } = require("mongodb"); 
 require('dotenv').config();
->>>>>>> origin/test
 
 const conex= require('./Configuraciones/ConStrDB');
 const { decryptData } = require('./DeCriptaPassAppDb');
@@ -39,8 +34,6 @@ const rutaDirCargaRequerimientosConfirmados = path.join(directorioActual, 'Carga
 const rutaDirPlanReposicion = path.join(directorioActual, 'PlanReposicion');
 const rutaDirPlanReposicion_Sem = path.join(directorioActual, 'PlanReposicion_Sem');
 
-<<<<<<< HEAD
-=======
 
 
 
@@ -57,7 +50,6 @@ const rutaDirMontecarlo = path.join(
   "montecarlo"
 );
 
->>>>>>> origin/test
 // Configuración de conexión a MongoDB
 //const mongoURL = 'mongodb://127.0.0.1:27017';
 //const userDbName = 'opti_users';
@@ -163,11 +155,7 @@ app.post('/login', async (req, res) => {
 
     rutaDirLogFile = `../${conex.getUser()}/log/LogdeCargaCSV.log`;
       
-<<<<<<< HEAD
-    const comando = `cd /d "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v2.js ${p_AppUser}`;
-=======
     const comando = `cd /d "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v3.js ${p_AppUser}`;
->>>>>>> origin/test
     
     console.log('ruta:'+rutaDirConfiguraCliente);
     console.log('Comando:'+comando);
@@ -281,11 +269,7 @@ app.post('/CargaCSVsku', upload.fields([
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-<<<<<<< HEAD
-//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-=======
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
->>>>>>> origin/test
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 app.post('/getActualCSVPol', async (req, res) => {
   try {
@@ -451,11 +435,7 @@ app.post('/CargaCSVhist', upload.fields([
   }
 });
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-<<<<<<< HEAD
-//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-=======
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
->>>>>>> origin/test
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1418,8 +1398,6 @@ app.post('/getCSVPol', async (req, res) => {
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-<<<<<<< HEAD
-=======
 app.post('/getCSVPol1', async (req, res) => {
   let client;
 
@@ -1499,7 +1477,6 @@ app.post('/getCSVPol1', async (req, res) => {
 module.exports = app;
 
 
->>>>>>> origin/test
 // Plan de Reposicion
 app.post('/CargaInvDisponible', upload.fields([{ name: 'doc', maxCount: 1 }]), async (req, res) => {
   try {
@@ -1594,36 +1571,6 @@ app.post('/getActualCSVInvDisp', async (req, res) => {
 
     console.log("conex generado");
 
-<<<<<<< HEAD
-    // Ruta donde se guardarán los archivos procesados
-    const processedDir = `../${DBName}/csv/in/procesados/`;
-
-    const files = fs.readdirSync(processedDir);
-
-    // Ordenar los archivos por fecha de modificación para obtener el más reciente
-    const sortedFiles = files
-      .map(file => ({
-        name: file,
-        time: fs.statSync(path.join(processedDir, file)).mtime.getTime()
-      }))
-      .sort((a, b) => b.time - a.time);
-
-    if (sortedFiles.length === 0) {
-      return res.status(404).send('No relevant CSV files found');
-    }
-
-    // Descargar el archivo CSV más reciente del directorio procesado
-    const file = sortedFiles[0];
-    res.download(file.path, file.name, (err) => {
-      if (err) {
-        console.error('Error downloading the file:', err);
-        res.status(500).send('Error downloading the file');
-      }
-    });
-  } catch (error) {
-    console.error('Error getting the latest CSV:', error);
-    res.status(500).send('Error getting the latest CSV');
-=======
     // Ruta del directorio donde están los archivos procesados
     const processedDir = path.resolve(__dirname, `../${DBName}/csv/in/procesados/`);
 
@@ -1662,7 +1609,6 @@ app.post('/getActualCSVInvDisp', async (req, res) => {
   } catch (error) {
     console.error('Error al procesar los archivos CSV:', error);
     res.status(500).send('Error al procesar los archivos CSV');
->>>>>>> origin/test
   }
 });
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -1832,26 +1778,17 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
     console.log("Running plan de reposición - Diario");
     const usuarioLog = conex.getUser();
-<<<<<<< HEAD
-    const comando = `cd /d "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
-
-    exec(comando, (error, stdout, stderr) => {
-=======
     
     // Comando para ejecutar el Plan de Reposición Diario
     const comandoPlanReposicion = `cd /d "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comandoPlanReposicion, (error, stdout, stderr) => {
->>>>>>> origin/test
       if (error) {
         console.error('Diario - Error al ejecutar el comando:', error);
         res.status(500).send('Error al ejecutar el comando diario');
         return;
       }
       console.log('Diario - Comando ejecutado con éxito:', stdout);
-<<<<<<< HEAD
-      res.sendStatus(200);
-=======
       
       // Si el Plan de Reposición se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
       console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
@@ -1866,7 +1803,6 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
         console.log('PowerBI - Proceso ejecutado con éxito:', stdout);
         res.sendStatus(200);
       });
->>>>>>> origin/test
     });
   } catch (err) {
     console.error('Diario - Error al procesar:', err);
@@ -1874,10 +1810,6 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/test
 // Endpoint para ejecutar el plan de reposición semanal
 app.post('/runPlanReposicionSemanal', async (req, res) => {
   try {
@@ -1887,26 +1819,17 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
     console.log("Running plan de reposición - Semanal");
     const usuarioLog = conex.getUser();
-<<<<<<< HEAD
-    const comando = `cd /d "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
-
-    exec(comando, (error, stdout, stderr) => {
-=======
 
     // Comando para ejecutar el Plan de Reposición Semanal
     const comandoPlanReposicionSemanal = `cd /d "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comandoPlanReposicionSemanal, (error, stdout, stderr) => {
->>>>>>> origin/test
       if (error) {
         console.error('Semanal - Error al ejecutar el comando:', error);
         res.status(500).send('Error al ejecutar el comando semanal');
         return;
       }
       console.log('Semanal - Comando ejecutado con éxito:', stdout);
-<<<<<<< HEAD
-      res.sendStatus(200);
-=======
       
       // Si el Plan de Reposición Semanal se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
       console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
@@ -1921,7 +1844,6 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
         console.log('PowerBI - Proceso ejecutado con éxito:', stdout);
         res.sendStatus(200);
       });
->>>>>>> origin/test
     });
   } catch (err) {
     console.error('Semanal - Error al procesar:', err);
@@ -1929,10 +1851,6 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/test
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1948,10 +1866,7 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
       return res.status(400).send('Faltan parámetros necesarios');
     }
 
-<<<<<<< HEAD
-=======
     // Corregido: uso de backticks para interpolación de variables
->>>>>>> origin/test
     console.log(`user: ${appUser}\npass: ${appPass}\nDBName: ${DBName}\ntype: ${type}\ncal: ${cal}`);
     const decryptedAppPass = await decryptData(appPass);
 
@@ -1979,10 +1894,7 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
       return res.status(400).send('Tipo de plan no soportado');
     }
 
-<<<<<<< HEAD
-=======
     // Corregido: uso de backticks para interpolación de variables
->>>>>>> origin/test
     console.log(`Fetching data from collection: ${collectionName}`);
     const collection = db.collection(collectionName);
 
@@ -2002,10 +1914,7 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
     const filePath = path.join(__dirname, 'exported_data.csv');
     fs.writeFileSync(filePath, csv);
 
-<<<<<<< HEAD
-=======
     // Corregido: uso de backticks para interpolación de variables
->>>>>>> origin/test
     res.download(filePath, `${type}_data.csv`, (err) => {
       if (err) {
         console.error('Error downloading the file:', err);
@@ -2024,8 +1933,6 @@ app.post('/getCSVPlanReposicion', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-=======
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -2184,7 +2091,6 @@ app.post('/runOverridePlanReposicion_Sem', async (req, res) => {
   }
 });
 
->>>>>>> origin/test
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2192,11 +2098,6 @@ app.post('/runOverridePlanReposicion_Sem', async (req, res) => {
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-<<<<<<< HEAD
-// Iniciar el servidor
-const http = require('http');
-const { combinations } = require('mathjs');
-=======
 // Endpoint para ejecutar el override de la política de inventarios
 app.post('/runOverridePoliticaInventarios', async (req, res) => {
   try {
@@ -3353,7 +3254,6 @@ app.post("/api/create-user", (req, res) => {
 
 // Iniciar el servidor
 const http = require('http');
->>>>>>> origin/test
 
 // Elimina todas las referencias a SSL y HTTPS
 // const https = require('https');
@@ -3391,8 +3291,6 @@ async function getDecryptedPassUser(p_AppPass) {
     throw error;
   }
 }
-<<<<<<< HEAD
-
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3986,5 +3884,3 @@ app.get('/logs', async (req, res) => {
     });
   }
 });
-=======
->>>>>>> origin/test
