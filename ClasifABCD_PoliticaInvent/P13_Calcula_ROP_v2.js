@@ -12,18 +12,14 @@ const collectionName = process.argv.slice(2)[3] || "politica_inventarios_01";
 
 const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
-const parametro = dbName;
-const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
-const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
+const logFile = `C:/OptiBack/ClasifABCD_PoliticaInvent/log/P13DEBUG`;
+const debugLogFile = `C:/OptiBack/ClasifABCD_PoliticaInvent/log/P13DEBUG`;
 const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
 const client = new MongoClient(mongoUri);
 
 async function updateROP() {
-  writeToLog(
-    `\nPaso 13 - Calculo del Punto de reorden que representa la demanda en el plazo de entrega o ROP`
-  );
+  writeToLog(`\nPaso 13 - Calculo del Punto de Reorden (ROP)`);
 
   try {
     await client.connect();
@@ -34,13 +30,51 @@ async function updateROP() {
       .aggregate([
         {
           $project: {
-            SS_Cantidad: 1,
+            SKU: 1,
+            SS_Cantidad_Num: {
+              $cond: {
+                if: {
+                  $or: [
+                    { $eq: ["$SS_Cantidad", null] },
+                    { $eq: ["$SS_Cantidad", ""] },
+                  ],
+                },
+                then: 0,
+                else: { $toDouble: "$SS_Cantidad" },
+              },
+            },
             Prom_LT: 1,
             Demanda_Promedio_Diaria: 1,
             Tipo_Override: 1,
             Medida_Override: 1,
             Override_Min_Politica_Inventarios: 1,
             Override_Max_Politica_Inventarios: 1,
+            BaseROP: {
+              $add: [
+                {
+                  $cond: {
+                    if: {
+                      $or: [
+                        { $eq: ["$SS_Cantidad", null] },
+                        { $eq: ["$SS_Cantidad", ""] },
+                      ],
+                    },
+                    then: 0,
+                    else: { $toDouble: "$SS_Cantidad" },
+                  },
+                },
+                {
+                  $multiply: [
+                    { $ifNull: ["$Prom_LT", 0] },
+                    { $ifNull: ["$Demanda_Promedio_Diaria", 0] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        {
+          $addFields: {
             ROP: {
               $cond: {
                 if: {
@@ -52,26 +86,11 @@ async function updateROP() {
                 then: {
                   $cond: {
                     if: { $eq: ["$Tipo_Override", "SS"] },
-                    then: {
-                      $add: [
-                        "$SS_Cantidad",
-                        { $multiply: ["$Prom_LT", "$Demanda_Promedio_Diaria"] },
-                      ],
-                    },
+                    then: "$BaseROP",
                     else: {
                       $cond: {
-                        if: { $gt: ["$SS_Cantidad", 0] },
-                        then: {
-                          $add: [
-                            "$SS_Cantidad",
-                            {
-                              $multiply: [
-                                "$Prom_LT",
-                                "$Demanda_Promedio_Diaria",
-                              ],
-                            },
-                          ],
-                        },
+                        if: { $gt: ["$SS_Cantidad_Num", 0] },
+                        then: "$BaseROP",
                         else: {
                           $cond: {
                             if: { $eq: ["$Medida_Override", "Cantidad"] },
@@ -79,7 +98,7 @@ async function updateROP() {
                             else: {
                               $multiply: [
                                 "$Override_Max_Politica_Inventarios",
-                                "$Demanda_Promedio_Diaria",
+                                { $ifNull: ["$Demanda_Promedio_Diaria", 0] },
                               ],
                             },
                           },
@@ -88,12 +107,7 @@ async function updateROP() {
                     },
                   },
                 },
-                else: {
-                  $add: [
-                    "$SS_Cantidad",
-                    { $multiply: ["$Prom_LT", "$Demanda_Promedio_Diaria"] },
-                  ],
-                },
+                else: "$BaseROP",
               },
             },
           },
@@ -101,18 +115,16 @@ async function updateROP() {
       ])
       .toArray();
 
+    result.forEach((doc) => {
+      fs.appendFileSync(
+        debugLogFile,
+        `[SKU: ${doc.SKU}] SS_Num: ${doc.SS_Cantidad_Num}, LT: ${doc.Prom_LT}, DPD: ${doc.Demanda_Promedio_Diaria}, BaseROP: ${doc.BaseROP}, ROP: ${doc.ROP}\n`
+      );
+    });
+
     await Promise.all(
       result.map((doc) =>
-        col.updateOne(
-          {
-            _id: doc._id,
-          },
-          {
-            $set: {
-              ROP: doc.ROP,
-            },
-          }
-        )
+        col.updateOne({ SKU: doc.SKU }, { $set: { ROP: doc.ROP } })
       )
     );
 

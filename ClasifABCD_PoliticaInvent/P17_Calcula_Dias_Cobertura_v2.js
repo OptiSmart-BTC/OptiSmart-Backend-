@@ -76,7 +76,7 @@ async function calcularDiasCobertura() {
         inventario.Demanda_Promedio_Diaria === 0
           ? -1
           : Math.ceil(
-              inventario.Inventario_Promedio /
+              inventario.Inventario_sPromedio /
                 inventario.Demanda_Promedio_Diaria
             ),
       Vida_Util_Dias: 0,
@@ -85,7 +85,11 @@ async function calcularDiasCobertura() {
       SobreInventario_Dias: 0,
     }));
 
-    const diasCoberturaCollection = db.collection("ui_pol_inv_dias_cobertura");
+    const targetCollectionName = collectionName.includes("montecarlo")
+      ? "ui_pol_inv_dias_cobertura_montecarlo"
+      : "ui_pol_inv_dias_cobertura";
+    const diasCoberturaCollection = db.collection(targetCollectionName);
+
     await diasCoberturaCollection.insertMany(diasCobertura);
 
     console.log(

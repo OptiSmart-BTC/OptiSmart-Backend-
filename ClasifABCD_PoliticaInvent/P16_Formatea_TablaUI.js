@@ -73,23 +73,25 @@ async function copiarDatos() {
 }
 
 function formatearNumero(numero) {
-  if (typeof numero === "number") {
-    return numero.toLocaleString(undefined, {
+  const n = Number(numero);
+  if (!isNaN(n)) {
+    return n.toLocaleString(undefined, {
       minimumFractionDigits: 4,
       maximumFractionDigits: 4,
     });
   }
-  return numero;
+  return 0; // fallback to 0 if truly invalid
 }
 
 function formatearNumero2(numero) {
-  if (typeof numero === "number") {
-    return numero.toLocaleString(undefined, {
+  const n = Number(numero);
+  if (!isNaN(n)) {
+    return n.toLocaleString(undefined, {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
   }
-  return numero;
+  return 0;
 }
 
 function writeToLog(message) {

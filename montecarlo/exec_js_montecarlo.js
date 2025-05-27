@@ -14,7 +14,7 @@ const {
   DBName,
 } = require(`../../${parametroFolder}/cfg/dbvars`);
 const dbName = `btc_opti_${DBName}`;
-const rutaBaseScripts = "C:\\OptiBack\\OptiBack\\ClasifABCD_PoliticaInvent"; // Ruta a los scripts
+const rutaBaseScripts = "C:/OptiBack/ClasifABCD_PoliticaInvent"; // Ruta a los scripts
 
 async function copiarColeccion(client, dbName, tipoProceso) {
   const db = client.db(dbName);
@@ -40,7 +40,7 @@ async function copiarColeccion(client, dbName, tipoProceso) {
 
 async function actualizarDatos(client, coleccionMontecarlo) {
   try {
-    const db = client.db("btc_opti_JM");
+    const db = client.db(`btc_opti_${DBName}`);
     const simulacionesCollection = db.collection("resultados_simulaciones");
     const inventariosCollection = db.collection(coleccionMontecarlo);
 
@@ -61,8 +61,23 @@ async function actualizarDatos(client, coleccionMontecarlo) {
           opti: "SS_Opti",
           mod: "SS_Modelo",
         };
-        const columnaSeleccionada = columnas[mejor] || 0;
-        const valorSeleccionado = matchingSimulacion[columnaSeleccionada] || 0;
+
+        if (!columnas[mejor]) {
+          console.warn(
+            `Valor de 'mejor' inválido o no definido para SKU: ${skuInventario}`
+          );
+          continue;
+        }
+
+        const columnaSeleccionada = columnas[mejor];
+        const valorSeleccionado = matchingSimulacion[columnaSeleccionada];
+
+        if (valorSeleccionado == null) {
+          console.warn(
+            `Columna ${columnaSeleccionada} no tiene valor para SKU: ${skuInventario}`
+          );
+          continue;
+        }
 
         await inventariosCollection.updateOne(
           { _id: inventario._id },
@@ -114,6 +129,9 @@ async function ejecutarScript(
   coleccionMontecarlo
 ) {
   return new Promise((resolve, reject) => {
+    console.log(
+      `\n[INFO] Ejecutando ${nombreScript} sobre colección: ${coleccionMontecarlo}`
+    );
     const proceso = spawn("node", [
       nombreScript,
       dbName,
@@ -166,11 +184,39 @@ async function main() {
 
     const coleccionMontecarlo = await copiarColeccion(
       client,
-      "btc_opti_JM",
+      `btc_opti_${DBName}`,
       tipoProceso
     );
     await ejecutarMontecarlo(passadminDeCripta);
     await actualizarDatos(client, coleccionMontecarlo, passadminDeCripta);
+
+    console.log(
+      "Esperando 10 segundos para asegurar que MongoDB procese los cambios..."
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    await client.close();
+    console.log("Conexión a MongoDB cerrada después de actualizar datos.");
+
+    const client2 = new MongoClient(uri);
+    await client2.connect();
+    console.log("Conexión a MongoDB reabierta para ejecución de scripts.");
+
+    const db = client2.db(`btc_opti_${DBName}`);
+    const postUpdateCheck = await db
+      .collection(coleccionMontecarlo)
+      .find({ SS_Cantidad: { $ne: 0 } })
+      .count();
+
+    if (postUpdateCheck === 0) {
+      console.warn(
+        `SS_Cantidad sigue en 0 para todos los SKUs en ${coleccionMontecarlo}`
+      );
+    } else {
+      console.log(
+        `${postUpdateCheck} SKUs tienen SS_Cantidad actualizado correctamente en ${coleccionMontecarlo}`
+      );
+    }
 
     const scripts = [
       "P11_Calcula_Demanda_LT.js",
@@ -182,8 +228,8 @@ async function main() {
       "P17_Calcula_Dias_Cobertura_v2.js",
       "P17.1_Calcula_VidaUtilDias_ROPAlto_SobreinventarioDias.js",
       "P18_Calcula_Pallets.js",
-      "P19.1_Calcula_UOM.js",
       "P19_Calcula_Costo.js",
+      "P19.1_Calcula_UOM.js",
       "P20_Formatea_TablasUI_Costos.js",
       "P21_UneTablas.js",
     ];
@@ -200,13 +246,42 @@ async function main() {
           passadminDeCripta,
           coleccionMontecarlo
         );
-      } else if (script === "P21_UneTablas.js") {
+      } else if (
+        script === "P17.1_Calcula_VidaUtilDias_ROPAlto_SobreinventarioDias.js"
+      ) {
+        const diasCoberturaTarget = coleccionMontecarlo.includes("sem")
+          ? "ui_pol_inv_dias_cobertura_montecarlo_sem"
+          : "ui_pol_inv_dias_cobertura_montecarlo";
+
         await ejecutarScript(
           scriptCompleto,
           dbName,
           DBUser,
           passadminDeCripta,
-          "ui_politica_inventarios_montecarlo"
+          diasCoberturaTarget
+        );
+      } else if (script === "P20_Formatea_TablasUI_Costos.js") {
+        const coleccionCostoMontecarlo = coleccionMontecarlo.includes("sem")
+          ? "politica_inventarios_costo_montecarlo_sem"
+          : "politica_inventarios_costo_montecarlo";
+
+        await ejecutarScript(
+          scriptCompleto,
+          dbName,
+          DBUser,
+          passadminDeCripta,
+          coleccionCostoMontecarlo
+        );
+      } else if (script === "P21_UneTablas.js") {
+        const finalUI = coleccionMontecarlo.includes("sem")
+          ? "ui_politica_inventarios_montecarlo_sem"
+          : "ui_politica_inventarios_montecarlo";
+        await ejecutarScript(
+          scriptCompleto,
+          dbName,
+          DBUser,
+          passadminDeCripta,
+          finalUI
         );
       } else {
         await ejecutarScript(
@@ -219,7 +294,7 @@ async function main() {
       }
     }
 
-    await client.close();
+    await client2.close();
     console.log("Todos los procesos completados exitosamente.");
   } catch (error) {
     console.error("Error en la ejecución principal:", error);
