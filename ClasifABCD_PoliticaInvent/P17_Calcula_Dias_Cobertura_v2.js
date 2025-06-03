@@ -76,7 +76,7 @@ async function calcularDiasCobertura() {
         inventario.Demanda_Promedio_Diaria === 0
           ? -1
           : Math.ceil(
-              inventario.Inventario_sPromedio /
+              inventario.Inventario_Promedio /
                 inventario.Demanda_Promedio_Diaria
             ),
       Vida_Util_Dias: 0,
