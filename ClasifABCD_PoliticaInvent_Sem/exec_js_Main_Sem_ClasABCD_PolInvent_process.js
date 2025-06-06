@@ -104,16 +104,26 @@ async function IniciaejecutarArchivos() {
   writeToLog(`Inicio de ejecucion: ${moment().format('YYYY-MM-DD HH:mm:ss')}\n`);
 
   for (const archivo of archivos) {
-    console.log(`${archivo.nombre}`);
+    const inicio = moment();
     const comando = `node ${archivo.nombre} ${archivo.parametros}`;
-
+    console.log(`${archivo.nombre}`);
+  
+    writeToLog(`\n------------------------------`);
+    writeToLog(`Inicio de ${archivo.nombre}: ${inicio.format('YYYY-MM-DD HH:mm:ss')}`);
+  
     try {
       await ejecutarComando(comando);
+      const fin = moment();
+      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
+      writeToLog(`Fin de ${archivo.nombre}: ${fin.format('YYYY-MM-DD HH:mm:ss')}`);
+      writeToLog(`Duración: ${duracion} segundos`);
     } catch (error) {
-      const now_error = moment().format('YYYY-MM-DD HH:mm:ss');
-      writeToLog(`${now_error} - Error al ejecutar el archivo ${archivo.nombre}: ${error}`);
+      const fin = moment();
+      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
+      writeToLog(`Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`);
     }
   }
+  
 
   const now_fin = moment().format('YYYY-MM-DD HH:mm:ss');
   writeToLog(`\n\n`);

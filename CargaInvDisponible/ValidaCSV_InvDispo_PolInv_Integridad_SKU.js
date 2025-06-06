@@ -9,14 +9,9 @@ const parametroFolder = process.argv.slice(2)[1];
 
 const { decryptData } = require('./DeCriptaPassAppDb');
 const { host, puerto } = require('../Configuraciones/ConexionDB');
-//const { DBUser, DBPassword } = require(`../../${parametroFolder}/cfg/uservars`);
 const { DBUser, DBPassword, DBName } = require(`../../${parametroFolder}/cfg/dbvars`);
-const logFile = `../../${parametroFolder}/log/LogdeCargaInvDispoCSV.log`; // Cambia esta ruta según la ubicación de tu archivo CSV
+const logFile = `../../${parametroFolder}/log/LogdeCargaInvDispoCSV.log`;
 const csvPath = `../../${parametroFolder}/reportes/InvDisp_PolInv_SKU_No_Encontrados.csv`;
-
-//const mongoUri = `mongodb://${host}:${puerto}/${dbName}`;
-
-
 
 const csvWriterOptions = {
   path: csvPath,
@@ -28,9 +23,7 @@ const csvWriterOptions = {
   ],
 };
 
-
 async function main() {
-  //const mongoUri = `mongodb://dbTEST05:dfgh2354ikofhdsf@${host}:${puerto}/${dbName}?authSource=admin`;
   const passadminDeCripta = await getDecryptedPassadmin();
   const mongoUri = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/${dbName}?authSource=admin`;
   const client = new MongoClient(mongoUri);
@@ -38,80 +31,66 @@ async function main() {
   writeToLog(`\nPaso 08 - Validacion de Integridad de los SKU de la Politica de Inventarios.`);
 
   try {
-
-    // Comprueba si el archivo existe
     if (fs.existsSync(csvPath)) {
-      // Elimina el archivo si existe
       fs.unlinkSync(csvPath);
       console.log(`El archivo ${csvPath} ha sido eliminado.`);
-    } else {
-      console.log(`El archivo ${csvPath} no existe, no se ha realizado ninguna acción.`);
     }
 
-    
-    
-    
-    
-
-
     await client.connect();
-
     const db = client.db(dbName);
-    //const skuCollection = db.collection('sku');
-    //const historicoDemandaCollection = db.collection('historico_demanda');
-    const CollectionComparacion = db.collection('politica_inventarios_01');
     const ColeccionComparada = db.collection('inventario_disponible');
     const ColeccionRespaldo = db.collection('report_sin_sku_invdisp_vs_polinv');
 
-    const skuDocs = await CollectionComparacion.find({}).toArray();
-    const skus = skuDocs.map((doc) => doc.SKU);
+    // 1️⃣ Primero valida contra politica_inventarios_01
+    let skuDocs = await db.collection('politica_inventarios_01').find({}).toArray();
+    let skus = skuDocs.map((doc) => doc.SKU);
 
-    const skusNoEncontrados = await ColeccionComparada
-      .find({ SKU: { $nin: skus } })
-      .toArray();
+    let skusNoEncontrados = await ColeccionComparada.find({ SKU: { $nin: skus } }).toArray();
+
+    // 2️⃣ Si todavía quedan registros sin coincidencia, valida contra politica_inventarios_01_sem
+    if (skusNoEncontrados.length > 0 && skuDocs.length > 0) {
+      writeToLog(`\tValidando también contra politica_inventarios_01_sem...`);
+      skuDocs = await db.collection('politica_inventarios_01_sem').find({}).toArray();
+      skus = skuDocs.map((doc) => doc.SKU);
+
+      // Revalida solo los que no encontró antes
+      const idsNoEncontradosAntes = skusNoEncontrados.map((doc) => doc._id);
+      skusNoEncontrados = await ColeccionComparada.find({
+        _id: { $in: idsNoEncontradosAntes },
+        SKU: { $nin: skus }
+      }).toArray();
+    }
 
     if (skusNoEncontrados.length === 0) {
       writeToLog(`\tIntegridad de SKUs correcta.`);
       return;
     }
 
-    // Formatear la fecha en el formato "DD/MM/YYYY"
-    const registrosFormateados = skusNoEncontrados.map((registro) => {
-     // const fecha = registro.Fecha.toISOString().substring(8, 10) + '/' +
-       // registro.Fecha.toISOString().substring(5, 7) + '/' +
-        //registro.Fecha.toISOString().substring(0, 4);
-        
-      return {
-        SKU: registro.SKU,
-        Ubicacion: registro.Ubicacion,
-        Producto: registro.Producto,
-        Inventario_Disponible: registro.Inventario_Disponible
-      };
-    });
+    const registrosFormateados = skusNoEncontrados.map((registro) => ({
+      SKU: registro.SKU,
+      Ubicacion: registro.Ubicacion,
+      Producto: registro.Producto,
+      Inventario_Disponible: registro.Inventario_Disponible
+    }));
 
     const csvWriter = createCsvWriter(csvWriterOptions);
     await csvWriter.writeRecords(registrosFormateados);
 
-
-    const documentosAInsertar = skusNoEncontrados.map((registro) => {
-      return {
-        _id: registro._id,
-        SKU: registro.SKU,
-        Ubicacion: registro.Ubicacion,
-        Producto: registro.Producto,
-        Inventario_Disponible: registro.Inventario_Disponible
-      };
-    });
-    
+    const documentosAInsertar = skusNoEncontrados.map((registro) => ({
+      _id: registro._id,
+      SKU: registro.SKU,
+      Ubicacion: registro.Ubicacion,
+      Producto: registro.Producto,
+      Inventario_Disponible: registro.Inventario_Disponible
+    }));
 
     await ColeccionRespaldo.deleteMany({});
     await ColeccionRespaldo.insertMany(documentosAInsertar);
 
-
     const skusNoEncontradosIds = skusNoEncontrados.map((registro) => registro._id);
     await ColeccionComparada.deleteMany({ _id: { $in: skusNoEncontradosIds } });
 
-    writeToLog(`\tSe encontraron ${skusNoEncontradosIds.length} registros en el Inventario Dsiponible cargado con problemas de Integridad de SKUs`);
+    writeToLog(`\tSe encontraron ${skusNoEncontradosIds.length} registros en el Inventario Disponible sin coincidencia en ninguna política.`);
     writeToLog(`\tSe eliminan dichos registros para evitar errores en los calculos`);
   } catch (error) {
     writeToLog(`${now} - Error: ${error}`);
@@ -124,8 +103,6 @@ function writeToLog(message) {
   fs.appendFileSync(logFile, message + '\n');
 }
 
-
-// Obtener el valor desencriptado de passadmin
 async function getDecryptedPassadmin() {
   try {
     return await decryptData(`${DBPassword}`);
@@ -134,7 +111,5 @@ async function getDecryptedPassadmin() {
     throw error;
   }
 }
-
-
 
 main().catch(console.error);
