@@ -2,25 +2,40 @@ from prophet import Prophet
 from prophet.diagnostics import cross_validation, performance_metrics
 import pandas as pd
 import numpy as np
+import optuna
 
 # Configura la estacionalidad del modelo Prophet
-def prophet_configuration():
-    model = Prophet(weekly_seasonality=True, yearly_seasonality=True, daily_seasonality=False)
-    model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+def prophet_configuration(
+    n_changepoints,
+    changepoint_prior_scale=0.05,
+    seasonality_prior_scale=10.0
+):
+    model = Prophet(
+        weekly_seasonality=True,
+        yearly_seasonality=True,
+        daily_seasonality=False,
+        n_changepoints=n_changepoints,
+        changepoint_prior_scale=changepoint_prior_scale,
+        seasonality_prior_scale=seasonality_prior_scale,
+    )
+    model.add_country_holidays(country_name='MX')
+    model.add_seasonality(name='monthly',   period=30.5,  fourier_order=5)
+    model.add_seasonality(name='quarterly', period=91.25, fourier_order=3)
+    model.add_regressor('day_of_week')
+    model.add_regressor('week_of_year')
+    model.add_regressor('month')
     return model
 
 # Función para preparar los datos de Prophet
 def data_preparation_prophet(filtered_df):
-    df_prophet = filtered_df[['Fecha', 'Cantidad']].rename(columns={'Fecha': 'ds', 'Cantidad': 'y'})
-    return df_prophet
+    df = filtered_df[['Fecha', 'Cantidad']].rename(columns={'Fecha': 'ds', 'Cantidad': 'y'})
+    # Variables de calendario
+    df['day_of_week'] = df['ds'].dt.weekday      # 0=Lun … 6=Dom
+    df['week_of_year'] = df['ds'].dt.isocalendar().week.astype(int)
+    df['month']       = df['ds'].dt.month
+    return df
 
-# Función para realizar validación cruzada y calcular métricas de rendimiento
-def realizar_validacion_cruzada(model, initial, period, horizon):
-    df_cv = cross_validation(model, initial=initial, period=period, horizon=horizon)
-    df_p = performance_metrics(df_cv)
-    return df_cv, df_p
-
-def make_forecast(model, df_prophet, periodo_a_predecir = 52):
+def make_forecast(model, periods, freq):
 
     """Función para usar el modelo Prophet y que empieze a realizar las predicciones a futuro
     , indicando el horizonte por el ususario.
@@ -31,9 +46,11 @@ def make_forecast(model, df_prophet, periodo_a_predecir = 52):
     
     Salida:
     - El forecast de la determinada jerarquía"""
-    future = model.make_future_dataframe(periods=periodo_a_predecir, freq = 'W-MON')
-    forecast = model.predict(future)
-    return forecast
+    future = model.make_future_dataframe(periods=periods, freq=freq)
+    future['day_of_week']  = future['ds'].dt.weekday
+    future['week_of_year'] = future['ds'].dt.isocalendar().week.astype(int)
+    future['month']        = future['ds'].dt.month
+    return model.predict(future)
 
 # Función para unir las predicciones con la demanda real
 def join_predictions(df_prophet, forecast):
@@ -66,3 +83,47 @@ def calculate_metrics(df_merged):
     smape_percentage = smape * 100
 
     return wmape_percentage, smape_percentage, df_merged
+
+def realizar_validacion_cruzada_segura(model, df_prophet):
+    total_days = (df_prophet['ds'].max() - df_prophet['ds'].min()).days
+    initial    = int(total_days * 0.6)
+    period     = int(total_days * 0.2)
+    horizon    = total_days - initial - period
+    if horizon <= 0 or total_days < initial + horizon:
+        return pd.DataFrame(), pd.DataFrame()
+    init_str   = f"{initial} days"
+    per_str    = f"{period} days"
+    hor_str    = f"{horizon} days"
+    df_cv = cross_validation(model, initial=init_str, period=per_str, horizon=hor_str)
+    df_p  = performance_metrics(df_cv)
+    return df_cv, df_p
+
+def tune_hyperparams(df_prophet, freq, periodo_a_predecir, n_trials=5):
+    def objective(trial):
+        cps = trial.suggest_loguniform("changepoint_prior_scale", 0.001, 0.5)
+        sps = trial.suggest_loguniform("seasonality_prior_scale", 0.01, 10.0)
+        ncp = trial.suggest_int("n_changepoints", 5, 50)
+        model = Prophet(
+            weekly_seasonality=True,
+            yearly_seasonality=True,
+            daily_seasonality=False,
+            changepoint_prior_scale=cps,
+            seasonality_prior_scale=sps,
+            n_changepoints=ncp
+        )
+        model.add_country_holidays(country_name='MX')
+        model.add_seasonality(name='monthly',   period=30.5,  fourier_order=5)
+        model.add_seasonality(name='quarterly', period=91.25, fourier_order=3)
+        model.add_regressor('day_of_week')
+        model.add_regressor('week_of_year')
+        model.add_regressor('month')
+        model.fit(df_prophet)
+        df_cv, _ = realizar_validacion_cruzada_segura(model, df_prophet)
+        if df_cv.empty:
+            return float("inf")
+        perf = performance_metrics(df_cv)
+        return perf['rmse'].mean()
+    
+    study = optuna.create_study(direction="minimize")
+    study.optimize(objective, n_trials=n_trials)
+    return study.best_params

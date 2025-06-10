@@ -19,11 +19,11 @@ async function getCombinations() {
     const db = client.db(`btc_opti_${DBName}`);
     const collection = db.collection('demand_forecast_actual'); // Se usa demand_forecast_actual
 
-    // Obtener combinaciones únicas concatenando DmdUnit, DmdGroup y Loc
+    // Obtener combinaciones únicas concatenando Producto, Canal y Ubicación
     const results = await collection.aggregate([
       {
         $project: {
-          combination: { $concat: ["$Product", "-", "$Channel", "-", "$Loc"] }
+          combination: { $concat: ["$Producto", "-", "$Canal", "-", "$Ubicacion"] }
         }
       },
       {

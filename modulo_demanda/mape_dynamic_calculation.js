@@ -30,9 +30,9 @@ async function calcularMapeYAdquirirDatos() {
         // Calcular el MAPE
         for (const forecast of datosForecast) {
             const historico = await historicoCollection.findOne({
-                Product: forecast.Product,
-                Channel: forecast.Channel,
-                Loc: forecast.Loc,
+                Producto: forecast.Producto,
+                Canal: forecast.Canal,
+                Ubicacion: forecast.Ubicacion,
                 Fecha: forecast.Fecha
             });
 
@@ -50,9 +50,9 @@ async function calcularMapeYAdquirirDatos() {
 
             // Agregar resultado incluso si no hay histórico
             mapeResultados.push({
-                Product: forecast.Product,
-                Channel: forecast.Channel,
-                Loc: forecast.Loc,
+                Producto: forecast.Producto,
+                Canal: forecast.Canal,
+                Ubicacion: forecast.Ubicacion,
                 Fecha: forecast.Fecha,
                 DemandaReal: historico ? historico.Cantidad : null,
                 DemandaPredicha: forecast['Demanda Predicha'],
@@ -70,7 +70,7 @@ async function calcularMapeYAdquirirDatos() {
 
         // Adquirir los datos de la colección de métricas
         const metrics = await metricasCollection
-            .find({}, { projection: { _id: 0, Product: 1, Channel: 1, Loc: 1, 
+            .find({}, { projection: { _id: 0, Producto: 1, Canal: 1, Ubicacion: 1, 
                 Fecha: 1, DemandaReal: 1, DemandaPredicha: 1, MAPE: 1, forecast_date: 1 } })
             .sort({ forecast_date: -1})
             .toArray();

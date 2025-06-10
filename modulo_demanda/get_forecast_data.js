@@ -29,7 +29,7 @@ async function getForecastData() {
     // Obtener todos los datos de forecast
     const forecastData = await forecastCollection
       .find({})
-      .project({ _id: 0, Fecha: 1, 'Demanda Predicha': 1, forecast_date: 1, Product: 1, Channel: 1, Loc: 1 })
+      .project({ _id: 0, Fecha: 1, 'Demanda Predicha': 1, forecast_date: 1, Producto: 1, Canal: 1, Ubicacion: 1 })
       //.sort({ forecast_date: -1, Fecha: 1 }) // Ordenar primero por forecast_date descendente, luego por Fecha ascendente
       .toArray();
 

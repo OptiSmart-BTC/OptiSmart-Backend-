@@ -27,32 +27,44 @@ def load_and_clean_data(df_historico):
     # Convertir la columna '*StartDate' a formato datetime
     df_historico['Fecha'] = pd.to_datetime(df_historico['Fecha'], format='%d/%m/%Y')
 
-    rango_fechas = pd.date_range(start=df_historico['Fecha'].min(), end=df_historico['Fecha'].max(), freq='W-MON')
+    freq = pd.infer_freq(df_historico['Fecha'].sort_values())
 
-    return df_historico, rango_fechas
+    return df_historico, freq
 
 def completar_fechas(df_filtrado, rango_fechas):
     """
-    Completa las fechas faltantes en un DataFrame de series temporales
-    usando el método de Forward Fill para valores faltantes.
-
-    Args:
-        df_filtrado (pd.DataFrame): DataFrame de un DFU con ['Fecha', 'Cantidad'].
-        rango_fechas (pd.DatetimeIndex): Rango global de fechas.
-
-    Returns:
-        pd.DataFrame: DataFrame con las fechas completadas y los valores rellenados.
+    Completa las fechas faltantes (un rango ya predefinido) y hace FFill.
+    Atención: las decisiones de "min_registros" y "% ceros" deben aplicarse
+    sobre df_filtrado ORIGINAL, antes de rellenar, para no contar valores inventados.
     """
-    # Creación de un dataframe con el rango de fechas completo
-    df_completado = pd.DataFrame({'Fecha': rango_fechas})
+    df_full = pd.DataFrame({'Fecha': rango_fechas})
+    df_merge = (
+        df_full
+        .merge(df_filtrado, on='Fecha', how='left')
+        .sort_values('Fecha')
+    )
+    df_merge['Cantidad'] = df_merge['Cantidad'].fillna(method='ffill')
+    return df_merge
 
-    # Completar fechas faltantes con NaN
-    df_completado = pd.merge(df_completado, df_filtrado, on='Fecha', how='left')
-
-    # Rellenar valores faltantes utilizando el último valor conocido (Forward Fill)
-    df_completado['Cantidad'] = df_completado['Cantidad'].fillna(method='ffill')
-
-    return df_completado
+def resample_if_not_weekly(df, on='Fecha', value_col='Cantidad', target_freq='W-MON'):
+    """
+    Si la serie NO está ya en frecuencia semanal (target_freq),
+    la agrupamos y sumamos por semana.
+    """
+    # inferir frecuencia actual
+    current_freq = pd.infer_freq(df[on].sort_values())
+    if current_freq and current_freq.upper().startswith('W'):
+        # ya es semanal: devolvemos sin tocar
+        return df, current_freq.upper()
+    # si no es semanal, resampleamos a target_freq
+    df_sem = (
+        df
+        .set_index(on)
+        .groupby(['Producto','Canal','Ubicacion'])[value_col]
+        .resample(target_freq).sum()
+        .reset_index()
+    )
+    return df_sem, target_freq
 
 
 

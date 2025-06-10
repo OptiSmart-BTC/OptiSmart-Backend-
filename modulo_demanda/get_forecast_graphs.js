@@ -29,18 +29,18 @@ async function getForecastData() {
     const historicoCollection = db.collection(`historico_demanda_${appUser}`); // Colección de histórico
 
     // Separar la combinación en Product, Channel y Loc
-    const [Product, Channel, Loc] = combination.split('-');
+    const [Producto, Canal, Ubicacion] = combination.split('-');
 
     // Query para obtener datos del histórico
     const historicoData = await historicoCollection
-      .find({ Product, Channel, Loc })
+      .find({ Producto, Canal, Ubicacion })
       .project({ _id: 0, Fecha: 1, Cantidad: 1 }) // Seleccionar solo las columnas necesarias
       .sort({ Fecha: 1 }) // Ordenar por fecha
       .toArray();
 
     // Query para obtener datos del forecast
     const forecastData = await forecastCollection
-      .find({ Product, Channel, Loc })
+      .find({ Producto, Canal, Ubicacion })
       .project({ _id: 0, Fecha: 1, 'Demanda Predicha': 1, forecast_date: 1 }) // Seleccionar solo las columnas necesarias
       .sort({ Fecha: 1 }) // Ordenar por fecha
       .toArray();

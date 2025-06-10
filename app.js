@@ -3666,24 +3666,25 @@ app.get('/api/forecast/data', (req, res) => {
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-app.get('/api/forecast/metrics', (req, res) => {
-  const { appUser, dbName } = req.query;
+// Endpoint para calcular MAPE bajo demanda
+app.post('/api/forecast/calculate-metrics', (req, res) => {
+  const { appUser, dbName } = req.body;
 
-  if (!appUser || !dbName ) {
+  if (!appUser || !dbName) {
     return res.status(400).send('Faltan parámetros appUser o dbName.');
   }
 
-  const scriptPath = path.join(__dirname, 'modulo_demanda', 'mape_dynamic_calculation.js'); // Reemplaza con tu script real
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'mape_dynamic_calculation.js');
   const command = `node ${scriptPath} ${appUser} ${dbName}`;
 
   exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
     if (error) {
       console.error('Error al ejecutar el script:', error);
-      return res.status(500).send('Error al obtener las métricas del forecast.');
+      return res.status(500).send('Error al calcular las métricas del forecast.');
     }
     if (stderr) {
       console.error('Error en el script:', stderr);
-      return res.status(500).send('Error al obtener las métricas del forecast.');
+      return res.status(500).send('Error al calcular las métricas del forecast.');
     }
 
     try {
@@ -3694,6 +3695,60 @@ app.get('/api/forecast/metrics', (req, res) => {
       res.status(500).send('Error al procesar las métricas del forecast.');
     }
   });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para obtener métricas existentes sin calcular
+app.get('/api/forecast/existing-metrics', async (req, res) => {
+  const { appUser, dbName } = req.query;
+
+  if (!appUser || !dbName) {
+    return res.status(400).send('Faltan parámetros appUser o dbName.');
+  }
+
+  try {
+    const { MongoClient } = require('mongodb');
+    const { decryptData } = require('./modulo_demanda/DeCriptaPassAppDb');
+    const { host, puerto } = require('./Configuraciones/ConexionDB');
+    const { DBUser, DBPassword } = require(`../${appUser}/cfg/dbvars`);
+
+    const passadminDeCripta = await decryptData(DBPassword);
+    const mongoURI = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/btc_opti_${dbName}?authSource=admin`;
+    const client = await MongoClient.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+
+    const db = client.db();
+    const metricasCollection = db.collection(`metricas_forecast_${appUser}`);
+
+    // Obtener métricas existentes
+    const metrics = await metricasCollection
+      .find({}, { 
+        projection: { 
+          _id: 0, 
+          Producto: 1, 
+          Canal: 1, 
+          Ubicacion: 1, 
+          Fecha: 1, 
+          DemandaReal: 1, 
+          DemandaPredicha: 1, 
+          MAPE: 1, 
+          forecast_date: 1 
+        } 
+      })
+      .sort({ forecast_date: -1 })
+      .toArray();
+
+    await client.close();
+    
+    res.json({ metrics });
+  } catch (error) {
+    console.error('Error al obtener métricas existentes:', error);
+    res.status(500).send('Error al obtener las métricas existentes.');
+  }
 });
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
