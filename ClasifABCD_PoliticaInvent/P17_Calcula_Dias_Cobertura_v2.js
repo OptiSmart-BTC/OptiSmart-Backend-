@@ -85,7 +85,11 @@ async function calcularDiasCobertura() {
       SobreInventario_Dias: 0,
     }));
 
-    const diasCoberturaCollection = db.collection("ui_pol_inv_dias_cobertura");
+    const targetCollectionName = collectionName.includes("montecarlo")
+      ? "ui_pol_inv_dias_cobertura_montecarlo"
+      : "ui_pol_inv_dias_cobertura";
+    const diasCoberturaCollection = db.collection(targetCollectionName);
+
     await diasCoberturaCollection.insertMany(diasCobertura);
 
     console.log(

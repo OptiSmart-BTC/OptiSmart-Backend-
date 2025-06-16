@@ -67,14 +67,18 @@ async function calcularCosto() {
       };
     });
 
-    const CostoCollection = db.collection("politica_inventarios_costo");
+    const costoTargetCollectionName = collectionName.includes("montecarlo")
+      ? "politica_inventarios_costo_montecarlo"
+      : "politica_inventarios_costo";
+
+    const CostoCollection = db.collection(costoTargetCollectionName);
     await CostoCollection.insertMany(Costo);
 
     writeToLog(`\tTermina la Transforamación de datos de salida a Costo`);
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
-    if (client) await client.close(); // ✅ Siempre cerrar la conexión
+    if (client) await client.close();
   }
 }
 

@@ -12,18 +12,14 @@ const collectionName = process.argv.slice(2)[3] || "politica_inventarios_01";
 
 const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
-const parametro = dbName;
-const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
-const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
+const logFile = `C:/OptiBack/ClasifABCD_PoliticaInvent/log/P14DEBUG`;
+const debugLogFile = `C:/OptiBack/ClasifABCD_PoliticaInvent/log/P14DEBUG`;
 const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
 const client = new MongoClient(mongoUri);
 
 async function updateMETA() {
-  writeToLog(
-    `\nPaso 14 - Calculo del Inventario objetivo al momento de hacer un pedido o META`
-  );
+  writeToLog(`\nPaso 14 - Calculo de la META`);
 
   try {
     await client.connect();
@@ -34,21 +30,50 @@ async function updateMETA() {
       .aggregate([
         {
           $project: {
+            SKU: 1,
             ROQ: 1,
             SS_Cantidad: 1,
-            META: { $add: ["$ROQ", "$SS_Cantidad"] },
+            BaseMETA: {
+              $add: [
+                { $ifNull: ["$ROQ", 0] },
+                {
+                  $cond: {
+                    if: {
+                      $or: [
+                        { $eq: ["$SS_Cantidad", null] },
+                        { $eq: ["$SS_Cantidad", ""] },
+                      ],
+                    },
+                    then: 0,
+                    else: { $toDouble: "$SS_Cantidad" },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        {
+          $addFields: {
+            META: "$BaseMETA",
           },
         },
       ])
       .toArray();
 
+    result.forEach((doc) => {
+      fs.appendFileSync(
+        debugLogFile,
+        `[SKU: ${doc.SKU}] ROQ: ${doc.ROQ}, SS_Cantidad: ${doc.SS_Cantidad}, BaseMETA: ${doc.BaseMETA}, META: ${doc.META}\n`
+      );
+    });
+
     await Promise.all(
       result.map((doc) =>
-        col.updateOne({ _id: doc._id }, { $set: { META: doc.META } })
+        col.updateOne({ SKU: doc.SKU }, { $set: { META: doc.META } })
       )
     );
 
-    writeToLog(`\tTermina el Calculo de META`);
+    writeToLog(`\tTermina el Calculo de la META`);
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {

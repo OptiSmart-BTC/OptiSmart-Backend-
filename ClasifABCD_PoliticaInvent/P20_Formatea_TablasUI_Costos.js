@@ -64,7 +64,11 @@ async function formatAndSaveData() {
       formattedData.push(formattedDocument);
     });
 
-    const targetCollection = db.collection(targetCollectionName);
+    const collectionTargetName = collectionName.includes("montecarlo")
+      ? "ui_pol_inv_costo_montecarlo"
+      : "ui_pol_inv_costo";
+
+    const targetCollection = db.collection(collectionTargetName);
     await targetCollection.insertMany(formattedData);
 
     writeToLog(
