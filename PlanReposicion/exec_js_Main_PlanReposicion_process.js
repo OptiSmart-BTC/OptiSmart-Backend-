@@ -42,7 +42,13 @@ async function IniciaejecutarArchivos() {
     
     { nombre: 'PR07_SKU_MOQ.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'Ejecuta_PlanPorNivel.js', parametros: `${DBName} ${DBUser} ${passadminDeCripta}` },
+    
+    { nombre: 'PR11_Calculo_Indicadores.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'PR12_Alerta_Excedente.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+
+
     { nombre: 'PR10_Formatea_TablaUI.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` }
+    
   ];
   
 
