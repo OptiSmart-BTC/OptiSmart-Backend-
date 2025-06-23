@@ -1,0 +1,3 @@
+{"level":"info","message":"Server running on port 3000","service":"user-service","timestamp":"2024-07-11 09:32:46"}
+{"body":{"DBName":"yourDBName","appPass":"yourPassword","appUser":"yourUser"},"level":"info","message":"Received request for daily replenishment plan","service":"user-service","timestamp":"2024-07-11 09:47:50"}
+{"err":"Exception in thread \"main\" ","level":"error","message":"Error processing daily replenishment plan","service":"user-service","timestamp":"2024-07-11 09:47:53"}

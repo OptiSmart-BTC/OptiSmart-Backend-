@@ -114,7 +114,10 @@ async function crearTablaPoliticaInventarios() {
 
   const collection1 = 'ui_sem_all_pol_inv';
   const collection2 = 'ui_sem_pol_inv_dias_cobertura';
+<<<<<<< HEAD
+=======
 
+>>>>>>> origin/test
   const col1 = db.collection(collection1);
   const col2 = db.collection(collection2);
 
@@ -331,6 +334,9 @@ for (const doc of result3) {
   );
 }
 
+<<<<<<< HEAD
+
+=======
 //-----------------------------------------------------------------
 const sourceCollectionName1 = 'politica_inventarios_01_sem'; 
 
@@ -359,6 +365,7 @@ const documents = await sourceCollection.find().toArray();
 const result11 = await targetCollection.insertMany(documents);
 
 console.log(`Se copiaron ${result11.insertedCount} documentos a la colección destino.`);
+>>>>>>> origin/test
 
 
     writeToLog(`\tTermina la Union de la Tablas de Politicas de Inventario`);

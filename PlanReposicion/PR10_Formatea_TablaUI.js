@@ -3,16 +3,18 @@ const fs = require('fs');
 const { MongoClient } = require('mongodb');
 const conex = require('../Configuraciones/ConStrDB');
 const moment = require('moment');
-const { host, puerto } = require('../Configuraciones/ConexionDB');
+
+const { host, puerto} = require('../Configuraciones/ConexionDB');
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
 
-const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
-const parte = dbName.substring(dbName.lastIndexOf("_") + 1);
+const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
+const parametro = dbName;
+const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion.log`;
+const logFile = `../../${parametroFolder}/log/PlanReposicion.log`; 
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
 async function copiarDatos() {
@@ -48,8 +50,7 @@ async function copiarDatos() {
         SS_Cantidad: formatearNumero(dato.SS_Cantidad ?? 0),
         ROP: formatearNumero(dato.ROP ?? 0),
         META: formatearNumero(dato.META ?? 0),
-        Excedente_Alerta: dato.Excedente_Alerta || "NO", // <-- NUEVA COLUMNA AQUI
-        'Cantidad Demanda Indirecta': formatearNumero2(dato.Cantidad_Demanda_Indirecta ?? 0),
+        'Cantidad Demanda Indirecta': formatearNumero2(dato.Cantidad_Demanda_Indirecta ?? 0), // renombrada
         Requiere_Reposicion: dato.Requiere_Reposicion,
         Cantidad_Reponer: formatearNumero(dato.Cantidad_Reponer ?? 0),
         MOQ: formatearNumero2(dato.MOQ ?? 0),

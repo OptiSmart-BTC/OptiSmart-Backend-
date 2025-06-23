@@ -1,0 +1,116 @@
+node:events:491
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1740:16)
+    at listenInCluster (node:net:1788:12)
+    at Server.listen (node:net:1876:7)
+    at Object.<anonymous> (C:\OptiBack\app.js:1410:34)
+    at Module._compile (node:internal/modules/cjs/loader:1254:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
+    at Module.load (node:internal/modules/cjs/loader:1117:32)
+    at Module._load (node:internal/modules/cjs/loader:958:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:81:12)
+    at node:internal/main/run_main_module:23:47
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1767:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v18.16.0
+node:events:491
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1740:16)
+    at listenInCluster (node:net:1788:12)
+    at Server.listen (node:net:1876:7)
+    at Object.<anonymous> (C:\OptiBack\app.js:1410:34)
+    at Module._compile (node:internal/modules/cjs/loader:1254:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
+    at Module.load (node:internal/modules/cjs/loader:1117:32)
+    at Module._load (node:internal/modules/cjs/loader:958:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:81:12)
+    at node:internal/main/run_main_module:23:47
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1767:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v18.16.0
+node:events:491
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1740:16)
+    at listenInCluster (node:net:1788:12)
+    at Server.listen (node:net:1876:7)
+    at Object.<anonymous> (C:\OptiBack\app.js:1410:34)
+    at Module._compile (node:internal/modules/cjs/loader:1254:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1308:10)
+    at Module.load (node:internal/modules/cjs/loader:1117:32)
+    at Module._load (node:internal/modules/cjs/loader:958:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:81:12)
+    at node:internal/main/run_main_module:23:47
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1767:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v18.16.0
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+
+Error al desencriptar el passadmin: Error: Could not find or load main class DeCriptaUtil
+
+Error al conectar a la base de datos: Error: Could not find or load main class DeCriptaUtil
+

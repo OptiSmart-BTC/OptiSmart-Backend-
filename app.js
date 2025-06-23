@@ -1810,7 +1810,6 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
   }
 });
 
-
 // Endpoint para ejecutar el plan de reposición semanal
 app.post('/runPlanReposicionSemanal', async (req, res) => {
   try {
@@ -1851,7 +1850,6 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
     res.status(500).send('Error al procesar el plan de reposición semanal');
   }
 });
-
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
@@ -3293,3 +3291,651 @@ async function getDecryptedPassUser(p_AppPass) {
     throw error;
   }
 }
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Función para vaciar la carpeta uploads después del procesamiento
+function limpiarCarpetaUploads() {
+  const uploadsDir = path.join(__dirname, 'uploads');
+  fs.readdir(uploadsDir, (err, files) => {
+    if (err) {
+      console.error('Error al leer la carpeta uploads:', err);
+      return;
+    }
+
+    // Borrar todos los archivos en la carpeta uploads
+    for (const file of files) {
+      fs.unlink(path.join(uploadsDir, file), (err) => {
+        if (err) {
+          console.error(`Error al borrar el archivo ${file}:`, err);
+        }
+      });
+    }
+  });
+}
+
+// Ruta para manejar la carga de archivos CSV y ejecutar el script de carga dinámico según la tabla seleccionada
+app.post('/upload', upload.single('file'), (req, res) => {
+  const { DBName, appUser, table } = req.body;
+
+  // Verificar si DBName, appUser, y table se enviaron
+  console.log('DBName:', DBName);
+  console.log('appUser:', appUser);
+  console.log('Table:', table);
+
+  if (!req.file) {
+    return res.status(400).send('No se ha subido ningún archivo.');
+  }
+
+  if (!DBName || !appUser || !table) {
+    return res.status(400).send('Faltan parámetros DBName, appUser o table.');
+  }
+
+  // Ruta del archivo subido en la carpeta 'uploads'
+  const filePath = path.join(__dirname, 'uploads', req.file.filename);
+  console.log(`Archivo recibido: ${filePath}`);
+
+  // Verificar si el archivo existe antes de continuar
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error(`Archivo no encontrado: ${filePath}`);
+      return res.status(500).send('Error: Archivo no encontrado.');
+    }
+
+    // Selección del script de carga según la tabla seleccionada
+    const loadCsvScriptPath = path.join(__dirname, 'modulo_demanda','Gestion_informacion','load_data_demand.js');
+
+    // Comando para ejecutar el script de carga con parámetros adicionales
+    const command = `node ${loadCsvScriptPath} "${filePath}" "${DBName}" "${appUser}" "${table}"`;
+
+    // Ejecutar el comando para procesar el archivo CSV en la base de datos
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error al ejecutar el script de carga: ${error.message}`);
+        return res.status(500).send('Error al procesar el archivo CSV.');
+      }
+      if (stderr) {
+        console.error(`Error en la ejecución del script: ${stderr}`);
+        return res.status(500).send('Error durante la ejecución del script.');
+      }
+
+      console.log(`Resultado del script: ${stdout}`);
+
+      // Limpiar la carpeta 'uploads' después de procesar el archivo
+      limpiarCarpetaUploads();
+
+      res.status(200).send(`Archivo CSV para la tabla "${table}" procesado y subido correctamente a MongoDB.`);
+    });
+  });
+});
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Ruta para descargar el CSV de la colección seleccionada
+app.post('/download-collection', (req, res) => {
+  console.log('Solicitud de descarga recibida');
+  const { appUser, DBName, selectedCollection } = req.body; // Asegúrate de que selectedCollection se envía desde el frontend
+  console.log('appUser:', appUser, 'DBName:', DBName, 'selectedCollection:', selectedCollection);  // Verifica si los parámetros se están recibiendo correctamente
+
+  const exportScriptPath = path.join(__dirname, 'modulo_demanda', 'Gestion_informacion', 'export_data_demand.js');
+  const command = `node ${exportScriptPath} "${DBName}" "${appUser}" "${selectedCollection}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error al ejecutar el script: ${error.message}`);
+      return res.status(500).send('Error en la exportación');
+    }
+    console.log('Script ejecutado exitosamente');
+    
+    const csvFilePath = path.join(__dirname, `modulo_demanda/exports/${selectedCollection}_${appUser}.csv`);
+    if (!fs.existsSync(csvFilePath)) {
+      console.error('Archivo CSV no encontrado:', csvFilePath);
+      return res.status(500).send('Archivo no encontrado');
+    }
+
+    res.download(csvFilePath, `${selectedCollection}.csv`, (err) => {
+      if (err) {
+        console.error('Error al descargar el archivo:', err);
+        res.status(500).send('Error en la descarga');
+      } else {
+        console.log('Archivo enviado correctamente');
+      }
+    });
+  });
+});
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Función para vaciar la carpeta uploads después del procesamiento
+function limpiarCarpetaUploads() {
+  const uploadsDir = path.join(__dirname, 'uploads');
+  fs.readdir(uploadsDir, (err, files) => {
+    if (err) {
+      console.error('Error al leer la carpeta uploads:', err);
+      return;
+    }
+
+    // Borrar todos los archivos en la carpeta uploads
+    for (const file of files) {
+      fs.unlink(path.join(uploadsDir, file), (err) => {
+        if (err) {
+          console.error(`Error al borrar el archivo ${file}:`, err);
+        }
+      });
+    }
+  });
+}
+
+// Ruta para manejar la actualización de archivos CSV y ejecutar el script update_historic_demand.js
+app.post('/update-collection', upload.single('file'), (req, res) => {
+  const { appUser, DBName, selectedCollection } = req.body;
+
+  // Verificar que todos los parámetros y el archivo estén presentes
+  if (!req.file || !appUser || !DBName || !selectedCollection) {
+    return res.status(400).send('Faltan parámetros o archivo.');
+  }
+
+  // Ruta del archivo que se acaba de subir
+  const filePath = path.join(__dirname, 'uploads', req.file.filename);
+  console.log(`Archivo recibido para actualización: ${filePath}`);
+  console.log(`Colección seleccionada para actualización: ${selectedCollection}`);
+
+  // Verificar si el archivo existe antes de ejecutar el script
+  fs.access(filePath, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.error(`Archivo no encontrado: ${filePath}`);
+      return res.status(500).send('Error: Archivo no encontrado.');
+    }
+
+    // Ruta del script para actualizar la colección seleccionada
+    const UpdatescriptPath = path.join(__dirname, 'modulo_demanda', 'update_data_demand.js');
+    const command = `node ${UpdatescriptPath} "${filePath}" "${appUser}" "${DBName}" "${selectedCollection}"`;
+
+    // Ejecutar el comando para actualizar la colección en MongoDB
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error al ejecutar el script: ${error.message}`);
+        return res.status(500).send('Error al actualizar la colección seleccionada.');
+      }
+      if (stderr) {
+        console.error(`Error en la ejecución del script: ${stderr}`);
+        return res.status(500).send('Error durante la ejecución del script.');
+      }
+
+      console.log(`Resultado del script: ${stdout}`);
+
+      // Limpiar la carpeta 'uploads' solo después de procesar el archivo
+      limpiarCarpetaUploads();
+
+      res.status(200).send('Actualización completada.');
+    });
+  });
+});
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get('/api/:selectedTable', (req, res) => {
+  const { selectedTable } = req.params;
+  const { appUser, DBName } = req.query;
+
+  if (!appUser || !DBName || !selectedTable) {
+    return res.status(400).send('Faltan parámetros appUser, DBName o selectedTable.');
+  }
+
+  const outputFile = path.join(__dirname, 'modulo_demanda', 'temp', `${selectedTable}_${appUser}_${Date.now()}.json`);
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'get_data_table.js');
+  const command = `node ${scriptPath} "${selectedTable}" "${appUser}" "${DBName}" "${outputFile}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send('Error al recuperar los datos de la tabla.');
+    }
+    
+    if (stderr) {
+      console.error('Error en el script:', stderr);
+      return res.status(500).send('Error al recuperar los datos de la tabla.');
+    }
+
+    try {
+      // Leer el archivo generado
+      const tableData = JSON.parse(fs.readFileSync(outputFile, 'utf8'));
+      
+      // Eliminar el archivo temporal
+      fs.unlinkSync(outputFile);
+      
+      res.json(tableData);
+    } catch (parseError) {
+      console.error('Error al parsear el JSON:', parseError);
+      res.status(500).send('Error al recuperar los datos de la tabla.');
+    }
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para ejecutar Prophet
+app.post('/api/forecast/run', (req, res) => {
+  const { appUser, dbName, parameters } = req.body;
+
+  // Validar parámetros
+  if (!appUser || !dbName || !parameters) {
+    return res.status(400).send('Faltan parámetros appUser, dbName o parameters.');
+  }
+
+  const { minRegistros, maxPorcentajeCeros, periodoAPredecir } = parameters;
+
+  // Validar valores de parámetros
+  if (minRegistros <= 0 || maxPorcentajeCeros < 0 || maxPorcentajeCeros > 1 || periodoAPredecir <= 0) {
+    return res.status(400).send('Parámetros inválidos. Verifica minRegistros, maxPorcentajeCeros y periodoAPredecir.');
+  }
+
+  // Definir la ruta al script de ejecución
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'Algoritmo_Prophet', 'exec_algoritmo_prophet.js');
+
+  // Construir el comando para ejecutar el script
+  const command = `node ${scriptPath} "${appUser}" "${dbName}" ${minRegistros} ${maxPorcentajeCeros} ${periodoAPredecir}`;
+
+  console.log(`Ejecutando forecast con el comando: ${command}`);
+
+  // Ejecutar el script
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error al ejecutar el script: ${error.message}`);
+      return res.status(500).send('Error al ejecutar el forecast.');
+    }
+    if (stderr) {
+      console.error(`Error en el script de ejecución: ${stderr}`);
+      return res.status(500).send(`Error durante la ejecución: ${stderr}`);
+    }
+
+    // Enviar la salida del script al cliente
+    try {
+      const result = stdout.trim();
+      console.log('Forecast ejecutado exitosamente:', result);
+      res.json({ message: 'Forecast ejecutado exitosamente.', result });
+    } catch (parseError) {
+      console.error('Error al procesar el resultado del script:', parseError.message);
+      res.status(500).send('Error al procesar los resultados del forecast.');
+    }
+  });
+});
+
+module.exports = app;
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get('/api/forecast/combinations', (req, res) => {
+  const { appUser, dbName } = req.query;
+  console.log('Parámetros recibidos:', req.query);
+
+  if (!appUser || !dbName) {
+    return res.status(400).send('Faltan parámetros appUser o DBName.');
+  }
+
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'get_forecast_combinations.js');
+  const command = `node ${scriptPath} "${appUser}" "${dbName}"`;
+
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send('Error al obtener combinaciones.');
+    }
+    if (stderr) {
+      console.error('Error en el script:', stderr);
+      return res.status(500).send('Error al obtener combinaciones.');
+    }
+
+    try {
+      const combinations = JSON.parse(stdout);
+      res.json({ combinations });
+    } catch (parseError) {
+      console.error('Error al parsear el JSON:', parseError);
+      res.status(500).send('Error al obtener combinaciones.');
+    }
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get('/api/forecast/data', (req, res) => {
+  const { appUser, dbName } = req.query;
+
+  console.log('Request parameters:', { appUser, dbName });
+
+  if (!appUser || !dbName ) {
+    return res.status(400).send('Faltan parámetros appUser o dbName.');
+  }
+
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'get_forecast_data.js');
+  const command = `node ${scriptPath} "${appUser}" "${dbName}"`;
+
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send('Error al obtener los datos del forecast.');
+    }
+    if (stderr) {
+      console.error('Error en el script:', stderr);
+      return res.status(500).send('Error al obtener los datos del forecast.');
+    }
+
+    try {
+      const forecastData = JSON.parse(stdout); // Parsear el JSON de salida
+      res.json({ forecastData });
+    } catch (parseError) {
+      console.error('Error al parsear el JSON:', parseError);
+      res.status(500).send('Error al procesar los datos del forecast.');
+    }
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para calcular MAPE bajo demanda
+app.post('/api/forecast/calculate-metrics', (req, res) => {
+  const { appUser, dbName } = req.body;
+
+  if (!appUser || !dbName) {
+    return res.status(400).send('Faltan parámetros appUser o dbName.');
+  }
+
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'mape_dynamic_calculation.js');
+  const command = `node ${scriptPath} ${appUser} ${dbName}`;
+
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send('Error al calcular las métricas del forecast.');
+    }
+    if (stderr) {
+      console.error('Error en el script:', stderr);
+      return res.status(500).send('Error al calcular las métricas del forecast.');
+    }
+
+    try {
+      const metrics = JSON.parse(stdout);
+      res.json({ metrics });
+    } catch (parseError) {
+      console.error('Error al parsear el JSON:', parseError);
+      res.status(500).send('Error al procesar las métricas del forecast.');
+    }
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+// Endpoint para obtener métricas existentes sin calcular
+app.get('/api/forecast/existing-metrics', async (req, res) => {
+  const { appUser, dbName } = req.query;
+
+  if (!appUser || !dbName) {
+    return res.status(400).send('Faltan parámetros appUser o dbName.');
+  }
+
+  try {
+    const { MongoClient } = require('mongodb');
+    const { decryptData } = require('./modulo_demanda/DeCriptaPassAppDb');
+    const { host, puerto } = require('./Configuraciones/ConexionDB');
+    const { DBUser, DBPassword } = require(`../${appUser}/cfg/dbvars`);
+
+    const passadminDeCripta = await decryptData(DBPassword);
+    const mongoURI = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/btc_opti_${dbName}?authSource=admin`;
+    const client = await MongoClient.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+
+    const db = client.db();
+    const metricasCollection = db.collection(`metricas_forecast_${appUser}`);
+
+    // Obtener métricas existentes
+    const metrics = await metricasCollection
+      .find({}, { 
+        projection: { 
+          _id: 0, 
+          Producto: 1, 
+          Canal: 1, 
+          Ubicacion: 1, 
+          Fecha: 1, 
+          DemandaReal: 1, 
+          DemandaPredicha: 1, 
+          MAPE: 1, 
+          forecast_date: 1 
+        } 
+      })
+      .sort({ forecast_date: -1 })
+      .toArray();
+
+    await client.close();
+    
+    res.json({ metrics });
+  } catch (error) {
+    console.error('Error al obtener métricas existentes:', error);
+    res.status(500).send('Error al obtener las métricas existentes.');
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get('/api/forecast/graphs', (req, res) => {
+  const { appUser, dbName, combination } = req.query;
+
+  console.log('Request parameters:', { appUser, dbName, combination });
+
+  if (!appUser || !dbName || !combination) {
+    return res.status(400).send('Faltan parámetros appUser o dbName.');
+  }
+
+  const scriptPath = path.join(__dirname, 'modulo_demanda', 'get_forecast_graphs.js');
+  const command = `node ${scriptPath} "${appUser}" "${dbName}" "${combination}"`;
+
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send('Error al obtener los datos del forecast.');
+    }
+    if (stderr) {
+      console.error('Error en el script:', stderr);
+      return res.status(500).send('Error al obtener los datos del forecast.');
+    }
+
+    try {
+      const forecastData = JSON.parse(stdout); // Parsear el JSON de salida
+      res.json({ forecastData });
+    } catch (parseError) {
+      console.error('Error al parsear el JSON:', parseError);
+      res.status(500).send('Error al procesar los datos del forecast.');
+    }
+  });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+app.post('/runClassification', (req, res) => {
+  const { dbName, appUser } = req.body;
+
+  console.log('DBName:', dbName);
+  console.log('appUser:', appUser);
+
+  // Validar parámetros
+  if (!dbName || !appUser) {
+    return res.status(400).send('Faltan parámetros DBName o appUser.');
+  }
+
+  // Construir el comando para invocar el ejecutable de Node con los argumentos
+  //   node exec_clasificador_demanda.js <appUser> <DBName>
+  const execPath = path.join(__dirname, 'modulo_demanda','Clasificador_Demanda','exec_clasificador_demanda.js');
+  const command = `node "${execPath}" "${appUser}" "${dbName}"`;
+
+  console.log(`Ejecutando: ${command}`);
+
+  // Invocar el proceso
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el proceso:', error);
+      return res.status(500).send(`Error al ejecutar la clasificación: ${error.message}`);
+    }
+
+    console.log('Salida del proceso (stdout):', stdout);
+    if (stderr) {
+      console.warn('Advertencias/errores (stderr):', stderr);
+    }
+
+    // Respuesta de éxito al cliente
+    return res.status(200).send('Proceso de clasificación ejecutado correctamente.');
+  });
+});
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// Endpoint para obtener los resultados de la clasificación de demanda
+app.get('/obtenerClasificacion', (req, res) => {
+  const { dbName, appUser } = req.query;
+
+  console.log('DBName:', dbName);
+  console.log('appUser:', appUser);
+
+  // Validar parámetros
+  if (!dbName || !appUser) {
+    return res.status(400).send('Faltan parámetros DBName o appUser.');
+  }
+
+  // Construir la ruta del script get_classification_data.js
+  // Ajusta la ruta según tu estructura de carpetas
+  const execPath = path.join(__dirname, 'modulo_demanda' , 'get_classification_data.js');
+  const command = `node "${execPath}" "${appUser}" "${dbName}"`;
+
+  console.log(`Ejecutando: ${command}`);
+
+  // Ejecutar el script
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Error al ejecutar el script:', error);
+      return res.status(500).send(`Error al obtener datos de clasificación: ${error.message}`);
+    }
+
+    console.log('Salida del script (stdout):', stdout);
+    if (stderr && stderr.trim()) {
+      console.warn('Advertencias/errores (stderr):', stderr);
+    }
+
+    try {
+      // Parsear la salida JSON del script
+      const data = JSON.parse(stdout);
+      return res.status(200).json(data);
+    } catch (parseError) {
+      console.error('Error al parsear JSON:', parseError);
+      return res.status(500).send(`Error al parsear datos: ${parseError.message}`);
+    }
+  });
+});
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// Endpoint para obtener los logs de la página gestión de información
+app.get('/logs', async (req, res) => {
+  try {
+    const { appUser, DBName, fileName } = req.query;
+    
+    // Validar parámetros requeridos
+    if (!appUser || !DBName || !fileName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Se requieren los parámetros appUser, DBName y fileName' 
+      });
+    }
+    
+    // Validación de seguridad para evitar path traversal
+    if (fileName.includes('..') || !fileName.endsWith('.log')) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Nombre de archivo no válido' 
+      });
+    }
+    
+    // Configurar la ruta al archivo de logs según tu estructura de directorios
+    // Puedes ajustar esta ruta según tu estructura de almacenamiento de logs
+    const logFilePath = path.join(__dirname, '..', appUser, 'log', fileName);
+
+
+
+    
+    // Verificar si el archivo existe
+    if (!fs.existsSync(logFilePath)) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Archivo de logs no encontrado' 
+      });
+    }
+    
+    // Leer el contenido del archivo
+    const logContent = fs.readFileSync(logFilePath, 'utf8');
+    
+    // Opcionalmente, puedes querer limitar la cantidad de contenido devuelto
+    // por ejemplo, solo las últimas N líneas
+    const lines = logContent.split('\n');
+    const lastLines = lines.slice(Math.max(lines.length - 500, 0)); // Últimas 500 líneas
+    const trimmedContent = lastLines.join('\n');
+    
+    // Registrar el acceso a los logs
+    console.log(`[${new Date().toISOString()}] Usuario ${appUser} accedió a los logs: ${fileName}`);
+    
+    // Devolver el contenido
+    res.send(trimmedContent);
+    
+  } catch (error) {
+    console.error('Error al obtener archivo de logs:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener el archivo de logs',
+      error: error.message 
+    });
+  }
+});

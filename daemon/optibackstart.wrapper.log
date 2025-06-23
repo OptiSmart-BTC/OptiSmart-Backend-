@@ -1,0 +1,50 @@
+2024-06-17 06:38:10 - Starting C:\Program Files\nodejs\node.exe  --harmony C:\Users\optiadmin\AppData\Roaming\npm\node_modules\node-windows\lib\wrapper.js --file C:\OptiBack\app.js --scriptoptions= --log "OptiBackStart wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2024-06-17 06:38:10 - Started 4856
+2024-06-17 06:39:36 - Starting C:\Program Files\nodejs\node.exe  --harmony C:\Users\optiadmin\AppData\Roaming\npm\node_modules\node-windows\lib\wrapper.js --file C:\OptiBack\app.js --scriptoptions= --log "OptiBackStart wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2024-06-17 06:39:36 - Started 5400
+2024-06-17 06:40:29 - Stopping optibackstart.exe
+2024-06-17 06:40:29 - ProcessKill 5400
+2024-06-17 06:40:30 - Found child process: 6376 Name: conhost.exe
+2024-06-17 06:40:30 - Found child process: 3644 Name: node.exe
+2024-06-17 06:40:30 - Stopping process 6376
+2024-06-17 06:40:30 - Send SIGINT 6376
+2024-06-17 06:40:30 - SIGINT to 6376 failed - Killing as fallback
+2024-06-17 06:40:30 - Stopping process 3644
+2024-06-17 06:40:30 - Send SIGINT 3644
+2024-06-17 06:40:30 - SIGINT to 3644 failed - Killing as fallback
+2024-06-17 06:40:30 - Stopping process 5400
+2024-06-17 06:40:30 - Send SIGINT 5400
+2024-06-17 06:40:30 - SIGINT to 5400 failed - Killing as fallback
+2024-06-17 06:40:30 - Finished optibackstart.exe
+2024-06-17 06:42:00 - Starting C:\Program Files\nodejs\node.exe  --harmony C:\Users\optiadmin\AppData\Roaming\npm\node_modules\node-windows\lib\wrapper.js --file C:\OptiBack\app.js --scriptoptions= --log "OptiBackStart wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2024-06-17 06:42:00 - Started 5488
+2024-06-17 06:57:01 - Stopping optibackstart.exe
+2024-06-17 06:57:01 - ProcessKill 5488
+2024-06-17 06:57:02 - Found child process: 4552 Name: conhost.exe
+2024-06-17 06:57:02 - Found child process: 2076 Name: node.exe
+2024-06-17 06:57:02 - Stopping process 4552
+2024-06-17 06:57:02 - Send SIGINT 4552
+2024-06-17 06:57:02 - SIGINT to 4552 failed - Killing as fallback
+2024-06-17 06:57:02 - Stopping process 2076
+2024-06-17 06:57:02 - Send SIGINT 2076
+2024-06-17 06:57:02 - SIGINT to 2076 failed - Killing as fallback
+2024-06-17 06:57:02 - Stopping process 5488
+2024-06-17 06:57:02 - Send SIGINT 5488
+2024-06-17 06:57:02 - SIGINT to 5488 failed - Killing as fallback
+2024-06-17 06:57:02 - Finished optibackstart.exe
+2024-06-17 06:57:04 - Starting C:\Program Files\nodejs\node.exe  --harmony C:\Users\optiadmin\AppData\Roaming\npm\node_modules\node-windows\lib\wrapper.js --file C:\OptiBack\app.js --scriptoptions= --log "OptiBackStart wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2024-06-17 06:57:04 - Started 7108
+2024-06-17 06:58:40 - Stopping optibackstart.exe
+2024-06-17 06:58:40 - ProcessKill 7108
+2024-06-17 06:58:40 - Found child process: 872 Name: conhost.exe
+2024-06-17 06:58:40 - Found child process: 208 Name: node.exe
+2024-06-17 06:58:40 - Stopping process 872
+2024-06-17 06:58:40 - Send SIGINT 872
+2024-06-17 06:58:40 - SIGINT to 872 failed - Killing as fallback
+2024-06-17 06:58:40 - Stopping process 208
+2024-06-17 06:58:40 - Send SIGINT 208
+2024-06-17 06:58:40 - SIGINT to 208 failed - Killing as fallback
+2024-06-17 06:58:40 - Stopping process 7108
+2024-06-17 06:58:40 - Send SIGINT 7108
+2024-06-17 06:58:40 - SIGINT to 7108 failed - Killing as fallback
+2024-06-17 06:58:40 - Finished optibackstart.exe

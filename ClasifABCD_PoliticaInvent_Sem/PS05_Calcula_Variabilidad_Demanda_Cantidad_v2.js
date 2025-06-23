@@ -43,6 +43,46 @@ async function calcularPromedioErrorCuadrado() {
     const weekStart = parseInt(SemanaInicio, 10);
     const yearEnd = parseInt(AñoFin, 10);
     const weekEnd = parseInt(SemanaFin, 10);
+<<<<<<< HEAD
+
+    const resultadosAgregados = await db.collection(historicoDemandaCollection).aggregate([
+      {
+        $match: {
+          Year: { $gte: yearStart, $lte: yearEnd },
+          Week: { $gte: weekStart, $lte: weekEnd }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            Producto: "$Producto",
+            Ubicacion: "$Ubicacion"
+          },
+          Demanda_Cantidad: { $sum: "$Error_Cuadrado_Cantidad" }
+        }
+      },
+      {
+        $addFields: {
+          Producto: "$_id.Producto",
+          Ubicacion: "$_id.Ubicacion"
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          Producto: 1,
+          Ubicacion: 1,
+          Demanda_Cantidad: 1
+        }
+      }
+    ]).toArray();
+    
+    const resultadosDivididos = resultadosAgregados.map(resultado => ({
+      Producto: resultado.Producto,
+      Ubicacion: resultado.Ubicacion,
+      Variabilidad_Demanda_Cantidad: resultado.Demanda_Cantidad / (Math.ceil(diasprom / 7)),
+    }));
+=======
  
     writeToLog (` ${yearEnd} ${yearStart} ${weekEnd} ${weekStart}`);
 
@@ -122,6 +162,7 @@ console.table(resultadosDivididos);
 
    
 
+>>>>>>> origin/test
     
     const demandaAbcd01Collection = db.collection('politica_inventarios_01_sem');
     
@@ -131,7 +172,13 @@ console.table(resultadosDivididos);
         { $set: { Variabilidad_Demanda_Cantidad: resultado.Variabilidad_Demanda_Cantidad } }
       );
     }
+<<<<<<< HEAD
+    //const formattedResult = JSON.stringify(resultadosDivididos, null, 2);
+    //writeToLog(formattedResult);
+
+=======
     
+>>>>>>> origin/test
     const politicaInventariosCollection = db.collection('politica_inventarios_01_sem');
 
     const resul = await politicaInventariosCollection.find({}).toArray();
