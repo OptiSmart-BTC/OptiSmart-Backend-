@@ -155,7 +155,7 @@ app.post('/login', async (req, res) => {
 
     rutaDirLogFile = `../${conex.getUser()}/log/LogdeCargaCSV.log`;
       
-    const comando = `cd /d "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v3.js ${p_AppUser}`;
+    const comando = `cd "${rutaDirConfiguraCliente}" && node exec_js_Main_ConfiguraCliente_process_v3.js ${p_AppUser}`;
     
     console.log('ruta:'+rutaDirConfiguraCliente);
     console.log('Comando:'+comando);
@@ -216,7 +216,7 @@ app.post('/CargaCSVsku', upload.fields([
     const rutaDirLogFile = path.join(__dirname, `../${DBName}/log/LogdeCargaCSV.log`);
     
     //Comando que ejecuta la carga del SKU
-    const comando = `cd /d "${rutaDirCargaSKU}" && node exec_js_SKUMain_LoadData.js ${appUser}`;
+    const comando = `cd "${rutaDirCargaSKU}" && node exec_js_SKUMain_LoadData.js ${appUser}`;
    
     try {
       console.log(comando);
@@ -388,7 +388,7 @@ app.post('/CargaCSVhist', upload.fields([
 
     const rutaDirLogFile = path.join(__dirname, `../${DBName}/log/LogdeCargaCSV.log`);
 
-    const comando = `cd /d "${rutaDirCargaHistorico}" && node exec_js_HistoricoMain_LoadData.js ${appUser}`;
+    const comando = `cd "${rutaDirCargaHistorico}" && node exec_js_HistoricoMain_LoadData.js ${appUser}`;
 
     try {
       const resultado = execSync(comando);
@@ -1269,8 +1269,8 @@ app.post('/runProcess', async (req, res) => {
 
     console.log("running x dia");
     const usuarioLog = conex.getUser();
-    const comando = `cd /d "${rutaDirClasifABCD}" && node exec_js_Main_ClasABCD_PolInvent_process_v2.js ${usuarioLog}`;
-    //const comando = `cd /d "${rutaDirClasifABCD}" && node exec_js_Main_ClasABCD_PolInvent_process_v2.js TEST01`;
+    const comando = `cd "${rutaDirClasifABCD}" && node exec_js_Main_ClasABCD_PolInvent_process_v2.js ${usuarioLog}`;
+    //const comando = `cd "${rutaDirClasifABCD}" && node exec_js_Main_ClasABCD_PolInvent_process_v2.js TEST01`;
     
     try {
       const resultado = execSync(comando);
@@ -1303,8 +1303,8 @@ app.post('/runProcessSem', async (req, res) => {
 
     console.log("running x sem");
     const usuarioLog = conex.getUser();
-    const comando = `cd /d "${rutaDirClasifABCDSem}" && node exec_js_Main_Sem_ClasABCD_PolInvent_process.js ${usuarioLog}`;
-    `cd /d " && node exec_js_Main_Sem_ClasABCD_PolInvent_process.js DemoUser01`;
+    const comando = `cd "${rutaDirClasifABCDSem}" && node exec_js_Main_Sem_ClasABCD_PolInvent_process.js ${usuarioLog}`;
+    `cd " && node exec_js_Main_Sem_ClasABCD_PolInvent_process.js DemoUser01`;
     try {
       const resultado = execSync(comando);
       //const filePath = path.resolve(__dirname, rutaDirLogFile);
@@ -1499,7 +1499,7 @@ app.post('/CargaInvDisponible', upload.fields([{ name: 'doc', maxCount: 1 }]), a
 
     const rutaDirLogFile = path.join(__dirname, `../${DBName}/log/LogdeCargaInvDispoCSV.log`);
 
-    const comando = `cd /d "${rutaDirCargaInvDisponible}" && node exec_js_InvDispoMain_LoadData.js ${appUser}`;
+    const comando = `cd "${rutaDirCargaInvDisponible}" && node exec_js_InvDispoMain_LoadData.js ${appUser}`;
 
     try {
       console.log(comando);
@@ -1641,7 +1641,7 @@ app.post('/CargaInvTrans', upload.fields([
 
     const rutaDirLogFile = path.join(__dirname, `../${DBName}/log/LogdeCargaInvTransCSV.log`);
 
-    const comando = `cd /d "${rutaDirCargaInvTrans}" && node exec_js_InvTransMain_LoadData.js ${appUser}`;
+    const comando = `cd "${rutaDirCargaInvTrans}" && node exec_js_InvTransMain_LoadData.js ${appUser}`;
 
     try {
       console.log(comando);
@@ -1717,7 +1717,7 @@ app.post('/CargaRequerimientosConfirmados', upload.fields([
 
     const rutaDirLogFile = path.join(__dirname, `../${DBName}/log/LogdeCargaRequConfCSV.log`);
 
-    const comando = `cd /d "${rutaDirCargaRequerimientosConfirmados }" && node exec_js_RequConfir_Main_LoadData.js ${appUser}`;
+    const comando = `cd "${rutaDirCargaRequerimientosConfirmados }" && node exec_js_RequConfir_Main_LoadData.js ${appUser}`;
 
     try {
       console.log(comando);
@@ -1780,7 +1780,7 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
     const usuarioLog = conex.getUser();
     
     // Comando para ejecutar el Plan de Reposición Diario
-    const comandoPlanReposicion = `cd /d "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
+    const comandoPlanReposicion = `cd "${rutaDirPlanReposicion}" && node exec_js_Main_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comandoPlanReposicion, (error, stdout, stderr) => {
       if (error) {
@@ -1792,7 +1792,7 @@ app.post('/runPlanReposicionDiario', async (req, res) => {
       
       // Si el Plan de Reposición se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
       console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
-      const comandoPowerBI = `cd /d "${rutaDirPowerBi_PlanReposicion}" && node exec_js_Main_PowerBI_PR_process.js ${usuarioLog}`;
+      const comandoPowerBI = `cd "${rutaDirPowerBi_PlanReposicion}" && node exec_js_Main_PowerBI_PR_process.js ${usuarioLog}`;
       
       exec(comandoPowerBI, (error, stdout, stderr) => {
         if (error) {
@@ -1822,7 +1822,7 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
     const usuarioLog = conex.getUser();
 
     // Comando para ejecutar el Plan de Reposición Semanal
-    const comandoPlanReposicionSemanal = `cd /d "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
+    const comandoPlanReposicionSemanal = `cd "${rutaDirPlanReposicion_Sem}" && node exec_js_Main_Sem_PlanReposicion_process.js ${usuarioLog}`;
 
     exec(comandoPlanReposicionSemanal, (error, stdout, stderr) => {
       if (error) {
@@ -1834,7 +1834,7 @@ app.post('/runPlanReposicionSemanal', async (req, res) => {
       
       // Si el Plan de Reposición Semanal se ejecuta con éxito, ejecutar el proceso PowerBI Plan de Reposición
       console.log("Ejecutando proceso de PowerBI Plan de Reposición...");
-      const comandoPowerBI = `cd /d "${rutaDirPowerBi_PlanReposicion_Sem}" && node exec_js_Main_Sem_PowerBI_PR_process.js ${usuarioLog}`;
+      const comandoPowerBI = `cd "${rutaDirPowerBi_PlanReposicion_Sem}" && node exec_js_Main_Sem_PowerBI_PR_process.js ${usuarioLog}`;
       
       exec(comandoPowerBI, (error, stdout, stderr) => {
         if (error) {
@@ -1993,7 +1993,7 @@ app.post('/runOverridePlanReposicion', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirOverridePlanReposicion}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirOverridePlanReposicion}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2075,7 +2075,7 @@ app.post('/runOverridePlanReposicion_Sem', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirOverridePlanReposicion_Sem}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirOverridePlanReposicion_Sem}" && node exec_js_Main_OverridePlanReposicion_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2150,7 +2150,7 @@ app.post('/runOverridePoliticaInventarios', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2229,7 +2229,7 @@ app.post('/runOverridePoliticaInventarios_Sem', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2343,9 +2343,9 @@ app.post('/applyGeneralOverride', async (req, res) => {
     // Preparar el comando según tipoProceso
     let comando;
     if (tipoProceso === 'Diario') {
-      comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+      comando = `cd "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
     } else if (tipoProceso === 'Semanal') {
-      comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+      comando = `cd "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
     }
 
     exec(comando, (error, stdout, stderr) => {
@@ -2425,7 +2425,7 @@ app.post('/runOverridePoliticaInventarios_ROP', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2498,7 +2498,7 @@ app.post('/runOverridePoliticaInventarios_ROP_Sem', async (req, res) => {
 
     // Preparar el comando para ejecutar el proceso de override
     const overrideValuesString = JSON.stringify(overrideValues).replace(/"/g, '\\"');
-    const comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
+    const comando = `cd "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${overrideValuesString}"`;
 
     // Ejecutar el comando
     exec(comando, (error, stdout, stderr) => {
@@ -2612,9 +2612,9 @@ app.post('/applyGeneralOverride_ROP', async (req, res) => {
     // Preparar el comando según tipoProceso
     let comando;
     if (tipoProceso === 'Diario') {
-      comando = `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+      comando = `cd "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
     } else if (tipoProceso === 'Semanal') {
-      comando = `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
+      comando = `cd "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog} "${tempFilePath}"`;
     }
 
     exec(comando, (error, stdout, stderr) => {
@@ -2919,7 +2919,7 @@ app.post("/runMontecarloAndOverride", async (req, res) => {
 
     // 4. Ejecutar Monte Carlo
     console.log("Ejecutando Monte Carlo...");
-    const comandoMontecarlo = `cd /d "${rutaDirMontecarlo}" && node exec_js_montecarlo.js ${appUser} ${tipoProceso}`;
+    const comandoMontecarlo = `cd "${rutaDirMontecarlo}" && node exec_js_montecarlo.js ${appUser} ${tipoProceso}`;
     await ejecutarProceso(comandoMontecarlo);
     console.log("Monte Carlo ejecutado con éxito.");
 
@@ -2966,8 +2966,8 @@ app.post("/runMontecarloAndOverride", async (req, res) => {
     console.log("Ejecutando Override...");
     const comandoOverride =
       tipoProceso === "Diario"
-        ? `cd /d "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog}`
-        : `cd /d "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog}`;
+        ? `cd "${rutaDirPoliticaInventarios}" && node exec_js_Main_OverridePoliticaInventario_process.js ${usuarioLog}`
+        : `cd "${rutaDirPoliticaInventarios_Sem}" && node exec_js_Main_Sem_OverridePoliticaInventario_process.js ${usuarioLog}`;
     await ejecutarProceso(comandoOverride);
     console.log("Override ejecutado con éxito.");
 
