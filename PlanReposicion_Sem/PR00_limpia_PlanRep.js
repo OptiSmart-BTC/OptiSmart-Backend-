@@ -22,7 +22,7 @@ const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
 
 
 const collectionsToDelete = [
-  'plan_reposicion_01_sem',
+  'plan_reposicion_01_se,',
   'ui_sem_plan_reposicion'
 ];
 
@@ -38,7 +38,7 @@ async function deleteCollection(db, collectionName) {
 
 async function main() {
   let client;
-  writeToLog(`Paso 00 - Depuracion de Tablas del Proceso Semanal`);
+  writeToLog(`Paso 00 - Depuracion de Tablas del Proceso`);
  
 
   try {

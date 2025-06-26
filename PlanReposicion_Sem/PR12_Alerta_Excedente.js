@@ -11,10 +11,10 @@ const DBPassword = process.argv[4];
 const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 const parte = dbName.substring(dbName.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion.log`;
+const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
-const collectionName = 'plan_reposicion_01';
+const collectionName = 'plan_reposicion_01_sem';
 
 async function calcularExcedente() {
   writeToLog(`\nPaso 12 - Cálculo de Alerta de Excedentes`);
@@ -51,7 +51,7 @@ async function calcularExcedente() {
 
     if (updates.length > 0) {
       await collection.bulkWrite(updates);
-      writeToLog(`\t Excedente_Alerta actualizado en ${updates.length} documentos`);
+      writeToLog(`\t✔ Excedente_Alerta actualizado en ${updates.length} documentos`);
     }
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);

@@ -1,97 +1,77 @@
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
-const conex= require('../Configuraciones/ConStrDB');
+const conex = require('../Configuraciones/ConStrDB');
 const moment = require('moment');
-
 const { host, puerto } = require('../Configuraciones/ConexionDB');
 
-const dbName = process.argv.slice(2)[0];
-const DBUser = process.argv.slice(2)[1];
-const DBPassword = process.argv.slice(2)[2];
+const dbName = process.argv[2];
+const DBUser = process.argv[3];
+const DBPassword = process.argv[4];
+const nivelFiltrado = process.argv[5] ? parseInt(process.argv[5]) : null;
 
-//const url = `mongodb://${host}:${puerto}/${dbName}`;
-//const url = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-
-const parametro = dbName;
-const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
+const parte = dbName.substring(dbName.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`; 
+const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
+const collectionName = 'plan_reposicion_01_sem';
 
-const collection1 = 'plan_reposicion_01_sem';
-//const collection2 = 'politica_inventarios_01';
-
-// Realizar la operación de join y actualización
 async function actualizarDatos() {
-  //writeToLog('------------------------------------------------------------------------------');
-  writeToLog(`\nPaso 08 - Calculo del Plan de Reposicion en Cantidad Semanal`);
+  writeToLog(`\nPaso 08 - Calculo del Plan de Reposicion en Cantidad (Nivel ${nivelFiltrado})`);
 
   let client;
+
   try {
+    client = await MongoClient.connect(mongoUri);
+    const db = client.db(dbName);
+    const collection = db.collection(collectionName);
 
-  client = await MongoClient.connect(mongoUri);
-  //const client = await MongoClient.connect(url);
-  const db = client.db(dbName);
+    const filter = nivelFiltrado !== null ? { Nivel_OA: nivelFiltrado } : {};
+    const documentos = await collection.find(filter).toArray();
 
-  //const col1 = db.collection(collection1);
-  const collection = db.collection('plan_reposicion_01_sem'); 
+    const updates = [];
 
+    for (const doc of documentos) {
+      const requiere = doc.Requiere_Reposicion === 'Si';
+      const meta = doc.META || 0;
+      const confirmada = doc.Cantidad_Confirmada_Total || 0;
+      const indirecta = (nivelFiltrado >= 2)
+        ? (doc["Cantidad Demanda Indirecta"] || doc.Cantidad_Demanda_Indirecta || 0)
+        : 0;
+      const inventario = doc.Inventario_Disponible || 0;
+      const transito = doc.Cantidad_Transito || 0;
 
-  const pipeline = [
-    {
-      $project: {
-        SKU: 1,
-        Producto: 1,
-        Desc_Producto: 1,
-        Familia_Producto: 1,
-        Categoria: 1,
-        Segmentacion_Producto: 1,
-        Presentacion: 1,
-        Ubicacion: 1,
-        Desc_Ubicacion: 1,
-        UOM_Base: 1,
-        Inventario_Disponible: 1,
-        Cantidad_Transito: 1,
-        Cantidad_Confirmada_Total: 1,        
-        SS_Cantidad: 1,
-        ROP: 1,
-        META: 1,
-        Requiere_Reposicion:1,
-        Cantidad_Reponer: 1,
-        MOQ: 1, 
-        Plan_Reposicion_Cantidad: {
-          $cond: {
-            if: { $gt: ['$Cantidad_Reponer', 0] },
-            then: {
-              $multiply: [
-                { $ceil: { $divide: ['$Cantidad_Reponer', '$MOQ'] } },
-                '$MOQ',
-              ],
-            },
-            else: 0,
-          },
-        },
-      },
-    },
-    {
-      $out: 'plan_reposicion_01_sem', 
+      const calculo = requiere
+        ? Math.max(0, Math.round(meta + confirmada + indirecta - inventario - transito))
+        : 0;
+
+      if (requiere && calculo === 0) {
+        writeToLog(` SKU=${doc.SKU} marcado como "Si" pero calculo da 0. meta=${meta}, confirmada=${confirmada}, indirecta=${indirecta}, inventario=${inventario}, transito=${transito}`);
+      }
+
+      updates.push({
+        updateOne: {
+          filter: { _id: doc._id },
+          update: {
+            $set: {
+              Cantidad_Reponer: calculo,
+              Plan_Reposicion_Cantidad: calculo
+            }
+          }
+        }
+      });
     }
-  ];
 
+    if (updates.length > 0) {
+      await collection.bulkWrite(updates);
+    }
 
-  await collection.aggregate(pipeline).toArray();
-
-  writeToLog(`\tTermina el Calculo del Inventario en Transito`);
+    writeToLog(`\t Cantidad y Plan_Reposicion_Cantidad calculados en ${updates.length} documentos para Nivel ${nivelFiltrado}`);
   } catch (error) {
-    // Manejar el error
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
-    // Cerrar la conexión a la base de datos
-    if (client) {
-      client.close();
-    }
+    if (client) client.close();
   }
 }
 
@@ -99,5 +79,4 @@ function writeToLog(message) {
   fs.appendFileSync(logFile, message + '\n');
 }
 
-// Llamar a la función para actualizar los datos
 actualizarDatos().catch(console.error);
