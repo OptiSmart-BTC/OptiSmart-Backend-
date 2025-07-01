@@ -69,6 +69,7 @@ async function IniciaejecutarArchivos() {
     { nombre: 'C14.1_Calcula_Clasificación_ABCD_v3.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C15_Formatea_TablaUI.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C16_Inserta_LastUpdate.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'C067_Calcula_Desviacion_estandar.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P00_limpia_politica_inv_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P01_Calcula_ValorZ.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P02_Calcula_Campos_Iniciales_v3.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },

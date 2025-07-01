@@ -70,9 +70,17 @@ async function calculateAndStoreStdev() {
       Ubicacion,
       Fecha_Corte: fechaFinal.toDate(),
       Desviacion_Estandar_Demanda: parseFloat(desviacion.toFixed(5)),
-      Cantidades: cantidades
+      // Cantidades: cantidades
     });
   }
+
+  if (resultados.length > 0) {
+  await destinoCol.deleteMany({});
+  await destinoCol.insertMany(resultados);
+  writeToLog(`\tSe insertaron ${resultados.length} documentos en demanda_stdev`);
+} else {
+  writeToLog('\t⚠️ No se generaron resultados. Verifica si hay datos en historico_demanda y si las fechas del horizonte están bien configuradas.');
+}
 
   await destinoCol.deleteMany({});
   await destinoCol.insertMany(resultados);
