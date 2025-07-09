@@ -32,7 +32,7 @@ async function crearTablaPoliticaInventarios() {
   const client = new MongoClient(mongoUri);
   try {
     await client.connect();
-
+    const db = client.db(dbName);
     const Collection1 = db.collection(uiCollectionName);
     const Collection2 = db.collection(allPolInvCollectionName);
     await Collection2.deleteMany({});
