@@ -26,12 +26,9 @@ const desiredFields = [
   'Segmentacion_Producto',
   'Ubicacion',
   'Desc_Ubicacion',
-<<<<<<< HEAD
-=======
   'Origen_Abasto',
   'Cantidad_Demanda_Indirecta',
   'Nivel_OA',
->>>>>>> origin/test
   'OverrideClasificacionABCD',
   'Override_Min_Politica_Inventarios',
   'Override_Max_Politica_Inventarios',
@@ -62,12 +59,9 @@ const fieldExamples = {
     Segmentacion_Producto: '<<Alfanum+Simbolos>>',
     Ubicacion: '<<Alfanum>>',
     Desc_Ubicacion:'<<Alfanum+Simbolos>>',
-<<<<<<< HEAD
-=======
     Origen_Abasto: 'Tienda A', // Ejemplo genérico, ajusta según los valores esperados
     Cantidad_Demanda_Indirecta: '150', // Asumiendo un número como ejemplo
     Nivel_OA: '1',
->>>>>>> origin/test
     OverrideClasificacionABCD:"<<Numerico o '-'>>",
     Override_Min_Politica_Inventarios:'<<Numerico o Vacio>>',
     Override_Max_Politica_Inventarios:'<<Numerico o Vacio>>',

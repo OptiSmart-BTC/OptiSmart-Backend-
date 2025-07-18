@@ -48,8 +48,16 @@
     "permission": "Politica-archivos descargar logs"
   },
   {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-aplicar incremental"
+  },
+  {
+    "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polInformacion.jsx",
+    "permission": "Politica-aplicar incremental"
+  },
+  {
     "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polParametros.jsx",
-    "permission": "Politica-parametros guardar cambios"
+    "permission": "Politica-eliminar colecciones"
   },
   {
     "file": "C:\\BTCOpti-WebApp\\opti-webapp\\src\\pages\\polParametros.jsx",

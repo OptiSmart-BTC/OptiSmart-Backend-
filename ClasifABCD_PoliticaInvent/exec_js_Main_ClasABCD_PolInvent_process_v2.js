@@ -4,51 +4,35 @@ const moment = require('moment');
 const { decryptData } = require('./DeCriptaPassAppDb');
 
 const parametroUsuario = process.argv.slice(2)[0];
+const modoEjecucion = process.argv.slice(2)[1] || 'completo'; // 'completo' o 'incremental'
 
 const { GB_DBName } = require(`../Configuraciones/dbUsers/${parametroUsuario}.dbnamevar.js`);
 const parametroFolder = GB_DBName.toUpperCase();
 
-//const { AppUser, AppPassword, Tipo} = require(`../../${parametroFolder}/cfg/${parametroUsuario}.uservars`);
 const { DBUser, DBPassword, DBName } = require(`../../${parametroFolder}/cfg/dbvars`);
 const dbName = `btc_opti_${DBName}`;
-
-//const parametroUsuario = process.argv.slice(2)[0];
-//const parametroFolder = parametroUsuario.toUpperCase();
-//const dbName = `btc_opti_${parametroUsuario}`;
 
 const logFileName = 'ClasABCD_PolInvent';
 const logFile = `../../${parametroFolder}/log/${logFileName}.log`;
 const logFolder = `../../${parametroFolder}/log/Log_historico`;
-
-
-//const { DBUser, DBPassword } = require(`../../${parametroFolder}/cfg/uservars`);
-
-
-
-
-
-
-//----------------------------------------------------------------------
 
 // Verificar si el archivo de log ya existe
 if (fs.existsSync(logFile)) {
   const timestamp = moment().format('YYYYMMDD_HHmmss');
   const renamedLogFile = `../../${parametroFolder}/log/Log_historico/${logFileName}_${timestamp}.log`;
 
-  // Crear el folder Log_historico si no existe
   if (!fs.existsSync(logFolder)) {
     fs.mkdirSync(logFolder);
   }
 
-  // Mover el archivo existente a Log_historico
   fs.renameSync(logFile, `${renamedLogFile}`);
 }
 
 async function IniciaejecutarArchivos() {
-
   const passadminDeCripta = await getDecryptedPassadmin();
 
-  const archivos = [
+  // Archivos de Clasificación ABCD (siempre se ejecutan)
+  const archivosClasificacion = [
     { nombre: 'C00_limpiaTablasProcesos_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C01_Calcula_Demanda_Costo_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C02_Calcula_Demanda_Porcentaje_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
@@ -69,6 +53,10 @@ async function IniciaejecutarArchivos() {
     { nombre: 'C14.1_Calcula_Clasificación_ABCD_v3.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C15_Formatea_TablaUI.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'C16_Inserta_LastUpdate.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+  ];
+
+  // Archivos de Políticas (modo completo)
+  const archivosPoliticasCompleto = [
     { nombre: 'P00_limpia_politica_inv_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P01_Calcula_ValorZ.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P02_Calcula_Campos_Iniciales_v3.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
@@ -96,12 +84,30 @@ async function IniciaejecutarArchivos() {
     { nombre: 'P19.1_Calcula_UOM.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P20_Formatea_TablasUI_Costos.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'P21_UneTablas.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    //{ nombre: 'P22_Guarda_en_ubis_saved.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
   ];
 
-  writeToLog(`Proceso de Clasificacion ABCD\n`);
+  // Proceso incremental (solo identificación y procesamiento de cambios)
+  const procesosIncrementales = [
+    { nombre: 'P23_Identifica_Cambios_Ubicaciones.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'P24_Procesa_Cambios_Incrementales.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+  ];
+
+  // Determinar qué archivos ejecutar
+  let archivosAEjecutar = [...archivosClasificacion];
+  
+  if (modoEjecucion === 'incremental') {
+    writeToLog(`Modo INCREMENTAL - Solo procesando cambios en ubicaciones`);
+    archivosAEjecutar = [...archivosAEjecutar, ...procesosIncrementales];
+  } else {
+    writeToLog(`Modo COMPLETO - Procesamiento completo de politicas`);
+    archivosAEjecutar = [...archivosAEjecutar, ...archivosPoliticasCompleto];
+  }
+
+  writeToLog(`Proceso de Clasificacion ABCD y Politicas de Inventario\n`);
   writeToLog(`Inicio de ejecucion: ${moment().format('YYYY-MM-DD HH:mm:ss')}\n`);
 
-  for (const archivo of archivos) {
+  for (const archivo of archivosAEjecutar) {
     const inicio = moment();
     const comando = `node ${archivo.nombre} ${archivo.parametros}`;
     console.log(`${archivo.nombre}`);
@@ -119,12 +125,43 @@ async function IniciaejecutarArchivos() {
       const fin = moment();
       const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
       writeToLog(`Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`);
+      
+      // En modo incremental, si hay error, cambiar a modo completo
+      if (modoEjecucion === 'incremental') {
+        writeToLog(`Error en modo incremental, cambiando a modo completo...`);
+        // Ejecutar proceso completo como fallback
+        for (const archivoCompleto of archivosPoliticasCompleto) {
+          await ejecutarArchivo(archivoCompleto, passadminDeCripta);
+        }
+        break;
+      }
     }
   }
   
   const now_fin = moment().format('YYYY-MM-DD HH:mm:ss');
   writeToLog(`\n\n`);
-  writeToLog(`Terminan el Proceso de Clasificacion ABCD: ${now_fin}\n`);
+  writeToLog(`Termina el Proceso de Clasificacion ABCD y Politicas de Inventario: ${now_fin}\n`);
+}
+
+async function ejecutarArchivo(archivo, passadminDeCripta) {
+  const inicio = moment();
+  const comando = `node ${archivo.nombre} ${archivo.parametros}`;
+  
+  writeToLog(`\n------------------------------`);
+  writeToLog(`Inicio de ${archivo.nombre}: ${inicio.format('YYYY-MM-DD HH:mm:ss')}`);
+  
+  try {
+    await ejecutarComando(comando);
+    const fin = moment();
+    const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
+    writeToLog(`Fin de ${archivo.nombre}: ${fin.format('YYYY-MM-DD HH:mm:ss')}`);
+    writeToLog(`Duración: ${duracion} segundos`);
+  } catch (error) {
+    const fin = moment();
+    const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
+    writeToLog(`Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`);
+    throw error;
+  }
 }
 
 function ejecutarComando(comando) {
@@ -143,8 +180,6 @@ function writeToLog(message) {
   fs.appendFileSync(logFile, message + '\n');
 }
 
-
-// Obtener el valor desencriptado de passadmin
 async function getDecryptedPassadmin() {
   try {
     return await decryptData(`${DBPassword}`);
@@ -153,6 +188,5 @@ async function getDecryptedPassadmin() {
     throw error;
   }
 }
-
 
 IniciaejecutarArchivos();

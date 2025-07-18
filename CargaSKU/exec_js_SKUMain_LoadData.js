@@ -29,6 +29,8 @@ const archivos = [
   { nombre: 'LimpiaEspaciosSKU_v4.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'CsvTempl_sku_v3.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'calcularNiveles.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` }, // Integración del cálculo de niveles
+  { nombre: 'Actualizar_Ubis_Saved.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
+
 
 ];
  

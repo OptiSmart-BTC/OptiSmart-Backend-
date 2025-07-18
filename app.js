@@ -34,6 +34,8 @@ const rutaDirCargaRequerimientosConfirmados = path.join(directorioActual, 'Carga
 const rutaDirPlanReposicion = path.join(directorioActual, 'PlanReposicion');
 const rutaDirPlanReposicion_Sem = path.join(directorioActual, 'PlanReposicion_Sem');
 
+//const rutaDirUsoPolitica = path.join(directorioActual, 'Uso_Politica_Guardada');
+
 
 
 
@@ -3937,5 +3939,235 @@ app.get('/logs', async (req, res) => {
       message: 'Error al obtener el archivo de logs',
       error: error.message 
     });
+  }
+});
+
+
+// Endpoint siguiendo el patrón de los endpoints que funcionan
+app.post('/getPoliticasGuardadas', async (req, res) => {
+
+  let client;
+
+  try {
+    const { appUser, appPass, DBName } = req.body;
+    if (!appUser || !appPass || !DBName) {
+      return res.status(400).json({ error: 'Faltan parámetros necesarios' });
+    }
+
+    const decryptedAppPass = await decryptData(appPass);
+    client = await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+
+    const userdb = conex.getDB();
+    const db = client.db(userdb);
+    const collection = db.collection('ubis_saved');
+
+    const data = await collection.find({}).toArray();
+
+    if (!data.length) {
+      return res.status(404).json({ error: 'No se encontraron políticas guardadas' });
+    }
+
+    // PROCESAR ARRAYS GRANDES - APLANAR LA ESTRUCTURA
+    const processedData = [];
+    
+    data.forEach((document, docIndex) => {
+      const baseInfo = {
+        documento_id: document._id.toString(),
+        fecha_ejecucion: document.fecha_ejecucion,
+        total_politicas: document.politica ? document.politica.length : 0
+      };
+
+      // Si hay políticas, procesarlas individualmente
+      if (document.politica && Array.isArray(document.politica)) {
+        document.politica.forEach((politica, polIndex) => {
+          try {
+            const cleanPolitica = cleanObjectForJson(politica);
+            processedData.push({
+              ...baseInfo,
+              politica_index: polIndex,
+              ...cleanPolitica
+            });
+          } catch (error) {
+            console.error(`Error procesando política ${polIndex} del documento ${docIndex}:`, error);
+            // Agregar registro de error en lugar de fallar completamente
+            processedData.push({
+              ...baseInfo,
+              politica_index: polIndex,
+              error: `Error procesando política: ${error.message}`,
+              raw_data: JSON.stringify(politica).substring(0, 100) + '...'
+            });
+          }
+        });
+      } else {
+        // Si no hay políticas, agregar solo la info base
+        processedData.push(baseInfo);
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      data: processedData,
+      count: processedData.length,
+      documentos_originales: data.length
+    });
+
+  } catch (err) {
+    console.error('Error al obtener políticas:', err);
+    res.status(500).json({ error: 'Error al obtener políticas guardadas' });
+  } finally {
+    if (client) {
+      client.close();
+    }
+  }
+});
+
+// FUNCIÓN PARA LIMPIAR OBJETOS PROBLEMÁTICOS
+function cleanObjectForJson(obj) {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  
+  if (typeof obj === 'string') {
+    // Limpiar caracteres problemáticos
+    return obj.replace(/[\x00-\x1F\x7F]/g, '').trim();
+  }
+  
+  if (typeof obj === 'number' || typeof obj === 'boolean') {
+    return obj;
+  }
+  
+  if (obj instanceof Date) {
+    return obj.toISOString();
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanObjectForJson(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      try {
+        // Limpiar la clave también
+        const cleanKey = key.replace(/[\x00-\x1F\x7F]/g, '').trim();
+        cleaned[cleanKey] = cleanObjectForJson(value);
+      } catch (error) {
+        console.error(`Error limpiando propiedad ${key}:`, error);
+        cleaned[key] = `Error: ${error.message}`;
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
+app.post('/runUsoPoliticaGuardada', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName, idPolitica, modoUso, comentario } = req.body;
+
+    if (!['modificar', 'restaurar'].includes(modoUso)) {
+      console.warn('[runUsoPoliticaGuardada] modoUso inválido:', modoUso);
+      return res.status(400).send('modoUso debe ser "modificar" o "restaurar"');
+    }
+
+    console.log(`[runUsoPoliticaGuardada] Ejecutando modo: ${modoUso} para política ID: ${idPolitica}`);
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, `btc_opti_${DBName}`);
+    const usuarioLog = conex.getUser();
+
+    const directorioActual = __dirname;
+    const rutaDirUsoPoliticaGuardada = path.join(directorioActual, 'Uso_Politica_Guardada');
+
+    const comando = `cd /d "${rutaDirUsoPoliticaGuardada}" && node exec_uso_politica_guardada.js ${modoUso} ${usuarioLog} ${idPolitica} "${comentario}"`;
+
+    console.log(`[runUsoPoliticaGuardada] Ejecutando comando: ${comando}`);
+
+    exec(comando, (error, stdout, stderr) => {
+      if (error) {
+        console.error('[runUsoPoliticaGuardada] Error durante la ejecución:', error);
+        return res.status(500).send('Error al ejecutar el proceso de política guardada');
+      }
+      console.log('[runUsoPoliticaGuardada] Proceso completado correctamente');
+      console.log('STDOUT:', stdout);
+      if (stderr) console.warn('STDERR:', stderr);
+      res.sendStatus(200);
+    });
+
+  } catch (err) {
+    console.error('[runUsoPoliticaGuardada] Error general:', err);
+    res.status(500).send('Error interno al procesar uso de política guardada');
+  }
+});
+
+app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName } = req.body;
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Conexión
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+
+    const client = conex.getClient(); // ✅ obtenemos el cliente
+    const db = client.db('btc_opti_' + DBName); // ✅ obtenemos la instancia correcta de la base de datos
+
+    const colecciones = ['ubis_saved', 'politica_inventarios_01'];
+    const resultados = [];
+
+    for (const nombre of colecciones) {
+      const exists = await db.listCollections({ name: nombre }).hasNext();
+      if (exists) {
+        await db.collection(nombre).deleteMany({});
+        resultados.push(`Colección '${nombre}' eliminada correctamente.`);
+      } else {
+        resultados.push(`Colección '${nombre}' no existe.`);
+      }
+    }
+
+    res.status(200).json({
+      mensaje: 'Operación completada.',
+      detalles: resultados
+    });
+
+  } catch (err) {
+    console.error('Error al eliminar las colecciones:', err);
+    res.status(500).send('Error al eliminar las colecciones.');
+  }
+});
+
+
+
+app.post('/runCambiosIncrementales', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName } = req.body;
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Configurar datos de conexión
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    const usuarioLog = conex.getUser();
+
+    console.log("Ejecutando proceso incremental (P23 + P24) para usuario:", usuarioLog);
+
+    // Comando para ejecutar el nuevo script incremental
+    const comandoIncremental = `cd /d "${rutaDirClasifABCD}" && node Ejecuta_CambiosIncrementales.js ${usuarioLog}`;
+
+    exec(comandoIncremental, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Incremental - Error al ejecutar:', error);
+        return res.status(500).send('Error al ejecutar proceso incremental');
+      }
+
+      console.log('Incremental - Proceso ejecutado con éxito');
+      res.status(200).send('Proceso incremental ejecutado correctamente');
+    });
+
+  } catch (err) {
+    console.error('Incremental - Error general:', err);
+    res.status(500).send('Error en el proceso incremental');
   }
 });
