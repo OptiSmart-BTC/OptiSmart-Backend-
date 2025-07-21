@@ -20,10 +20,12 @@ async function crearTablaPoliticaInventarios() {
   try {
     await client.connect();
     const db = client.db(dbName);
+
     const baseCollection = db.collection(uiCollectionName);
     const targetCollection = db.collection(allPolInvCollectionName);
 
     await targetCollection.deleteMany();
+
 
     const baseDocs = await baseCollection.find().toArray();
     const formattedDocs = baseDocs.map((doc) => ({
