@@ -51,6 +51,7 @@ async function insertCSVDataToMongoDB() {
           Ubicacion: String(data.Ubicacion), 
           Desc_Ubicacion: String(data.Desc_Ubicacion) ?? ' ', 
           Origen_Abasto: data.Origen_Abasto || 'Default Value', // Asegúrate de proporcionar un valor predeterminado si es necesario
+          Ignorar: data.Ignorar || 0,
           Cantidad_Demanda_Indirecta: parseFloat(data.Cantidad_Demanda_Indirecta) || 0, // Convierte a float y proporciona un valor predeterminado
           Nivel_OA: data.Nivel_OA || '1', // Asume '1' como valor predeterminado si no se proporciona
           OverrideClasificacionABCD: (data.OverrideClasificacionABCD !== null && data.OverrideClasificacionABCD !== '' && data.OverrideClasificacionABCD !== ' ') ? String(data.OverrideClasificacionABCD) : '-',

@@ -27,6 +27,7 @@ const desiredFields = [
   'Ubicacion',
   'Desc_Ubicacion',
   'Origen_Abasto',
+  'Ignorar',
   'Cantidad_Demanda_Indirecta',
   'Nivel_OA',
   'OverrideClasificacionABCD',
@@ -60,6 +61,7 @@ const fieldExamples = {
     Ubicacion: '<<Alfanum>>',
     Desc_Ubicacion:'<<Alfanum+Simbolos>>',
     Origen_Abasto: 'Tienda A', // Ejemplo genérico, ajusta según los valores esperados
+    Ignorar: '<<Si o vacio>>',
     Cantidad_Demanda_Indirecta: '150', // Asumiendo un número como ejemplo
     Nivel_OA: '1',
     OverrideClasificacionABCD:"<<Numerico o '-'>>",
