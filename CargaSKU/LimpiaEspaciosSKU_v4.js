@@ -38,6 +38,7 @@ async function eliminarRegistros() {
       Ubicacion: 'undefined',
       Desc_Ubicacion: 'undefined',
       Origen_Abasto: 'undefined',
+      Ignorar: 'undefined',
       Cantidad_Demanda_Indirecta: NaN,  // Asumiendo que un valor numérico inválido podría ser NaN
       Nivel_OA: 'undefined',
       OverrideClasificacionABCD: 'undefined',

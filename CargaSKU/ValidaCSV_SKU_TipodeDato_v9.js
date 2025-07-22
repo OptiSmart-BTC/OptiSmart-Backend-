@@ -15,7 +15,7 @@ const fieldValidations = {
   Origen_Abasto: { type: 'stringnullable', pattern: /^[A-Za-z0-9\s]*$/ }, // Permitir valores vacíos o alfanuméricos
   Cantidad_Demanda_Indirecta: { type: 'decimal' },
   Nivel_OA: { type: 'int', validValues: [1, 2, 3] }, // Solo 1, 2 o 3
-
+  Ignorar: {type: 'int', validValues: [0, 1]},
   Medida_Override: { type: 'stringMO', pattern: /^[A-Za-z0-9 ]+$/ },
   Tipo_Override: { type: 'stringTO', pattern: /^[A-Za-z0-9 ]+$/ },
   MargenUnitario: { type: 'decimal' },

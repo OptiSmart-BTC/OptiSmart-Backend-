@@ -21,6 +21,7 @@ const encabezadosRequeridos = [
 'Ubicacion',
 'Desc_Ubicacion',
 'Origen_Abasto',
+'Ignorar',
 'OverrideClasificacionABCD',
 'Override_Min_Politica_Inventarios',
 'Override_Max_Politica_Inventarios',
