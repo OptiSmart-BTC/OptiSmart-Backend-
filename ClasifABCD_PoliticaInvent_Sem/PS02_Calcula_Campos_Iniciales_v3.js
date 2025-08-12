@@ -1,11 +1,7 @@
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
-const conex= require('../Configuraciones/ConStrDB');
+const conex = require('../Configuraciones/ConStrDB');
 const moment = require('moment');
- 
-  // Configuración de conexión a la base de datos MongoDB
-  //const uri = 'mongodb://127.0.0.1:27017'; // Cambia esto si tu MongoDB se encuentra en un servidor diferente
-  //const dbName = 'btc_opti_a001';
 
 const { host, puerto } = require('../Configuraciones/ConexionDB');
 
@@ -13,22 +9,17 @@ const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
 
-//const uri = `mongodb://${host}:${puerto}/${dbName}`;
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-//const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`; 
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
-
 
 async function crearTablaPoliticaInventarios() {
-  //writeToLog('------------------------------------------------------------------------------');
+  const now = moment().format('YYYY-MM-DD HH:mm:ss');
+  
   writeToLog(`\nPaso 02 - Calculo de los Campos Iniciales`);
-
-
 
   const client = new MongoClient(mongoUri);
 
@@ -39,16 +30,26 @@ async function crearTablaPoliticaInventarios() {
     const demandaCollection = db.collection('demanda_abcd_01_sem');
     const politicaCollection = db.collection('politica_inventarios_01_sem');
 
-    // se limpia la tabla política_inventarios_01 antes de insertar nuevos datos
-    await politicaCollection.deleteMany({});
+    // Verificar que existan datos en la colección fuente
+    const countDemanda = await demandaCollection.countDocuments();
+    writeToLog(`\tRegistros en demanda_abcd_01_sem: ${countDemanda}`);
 
-    // se leen los datos de la tabla demanda_abcd_01
+    if (countDemanda === 0) {
+      writeToLog(`\tAdvertencia: No hay registros en demanda_abcd_01_sem para procesar`);
+      return;
+    }
+
+    // Limpiar la tabla política_inventarios_01_sem antes de insertar nuevos datos
+    const deleteResult = await politicaCollection.deleteMany({});
+    writeToLog(`\tRegistros eliminados de politica_inventarios_01_sem: ${deleteResult.deletedCount}`);
+
+    // Leer los datos de la tabla demanda_abcd_01_sem
     const datosDemanda = await demandaCollection.find().toArray();
 
-    // se crea un nuevo objeto con los campos y lógica especificados para cada registro
+    // Crear un nuevo objeto con los campos y lógica especificados para cada registro
     const politicaInventarios = datosDemanda.map((dato) => {
       return {
-        Tipo_Calendario:"Sem",
+        Tipo_Calendario: "Sem",
         SKU: dato.SKU,
         Producto: dato.Producto,
         Desc_Producto: dato.Desc_Producto,
@@ -63,7 +64,7 @@ async function crearTablaPoliticaInventarios() {
         Valor_Z: 0,
         UOM: "0",
         UOM_Base: "0",
-        Unidades_Empaque:"0",
+        Unidades_Empaque: "0",
         Demanda_Promedio_Semanal: 0,
         Lead_Time_Abasto: "0",
         Variabilidad_Demanda_Cantidad: 0,
@@ -84,28 +85,37 @@ async function crearTablaPoliticaInventarios() {
         Inventario_Promedio: 0,
         Medida_Override: "",
         Tipo_Override: "",
-<<<<<<< HEAD
-        STAT_SS: ""
-=======
         STAT_SS: "",
-        Override_SS_Cantidad: 0,
->>>>>>> origin/test
+        Override_SS_Cantidad: 0
       };
     });
- 
-    await politicaCollection.insertMany(politicaInventarios);
+
+    // Insertar los datos en la colección de política de inventarios
+    if (politicaInventarios.length > 0) {
+      const insertResult = await politicaCollection.insertMany(politicaInventarios);
+      writeToLog(`\tRegistros insertados en politica_inventarios_01_sem: ${insertResult.insertedCount}`);
+      
+      // Verificar la inserción
+      const countPolitica = await politicaCollection.countDocuments();
+      writeToLog(`\tTotal de registros en politica_inventarios_01_sem: ${countPolitica}`);
+    } else {
+      writeToLog(`\tNo se generaron registros para insertar`);
+    }
 
     writeToLog(`\tTermina el Calculo de los Campos Iniciales`);
+    
   } catch (err) {
-    writeToLog(`${now} - Error al crear la tabla política_inventarios_01: ${err}`);
+    writeToLog(`${now} - Error al crear la tabla política_inventarios_01_sem: ${err}`);
+    console.error('Error en crearTablaPoliticaInventarios:', err);
   } finally {
-    client.close();
+    await client.close();
   }
 }
 
 function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
+  const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+  fs.appendFileSync(logFile, `${timestamp} - ${message}\n`);
 }
 
-// Llamar a la función para ejecutarla
+// Ejecutar la función principal
 crearTablaPoliticaInventarios();

@@ -82,7 +82,9 @@ async function filtraSKU(passadminDeCripta) {
 
 async function reintegraIgnorados() {
   const passadminDeCripta = await getDecryptedPassadmin();
+
   await filtraSKU(passadminDeCripta);
+
   const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
     passadminDeCripta
   )}@${host}:${puerto}/?authSource=admin`;

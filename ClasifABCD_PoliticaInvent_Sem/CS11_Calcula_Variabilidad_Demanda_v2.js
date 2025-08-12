@@ -1,10 +1,9 @@
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
-const conex= require('../Configuraciones/ConStrDB');
+const conex = require('../Configuraciones/ConStrDB');
 const moment = require('moment');
 
-
-const { host, puerto} = require('../Configuraciones/ConexionDB');
+const { host, puerto } = require('../Configuraciones/ConexionDB');
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
@@ -15,13 +14,12 @@ const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`; 
 
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-//const mongoURI = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
+
 const historicoDemandaCollection = 'historico_demanda_sem'; 
 const demandaAbcd01Collection = 'demanda_abcd_01_sem'; 
 
 async function calcularPromedioErrorCuadrado() {
-
   const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
   writeToLog(`\nPaso 11 - Calculo de la Variabilidad de la Demanda por Semana`);
@@ -30,26 +28,28 @@ async function calcularPromedioErrorCuadrado() {
     const client = await MongoClient.connect(mongoUri, { useNewUrlParser: true });
     const db = client.db(dbName);
 
-    
+    // Obtener rango de fechas y días promedio
     const resultado = await CalculaRangoFechas(dbName);
     const fechaInicioObj = new Date(resultado.fechaInicio);
     const fechaFinObj = new Date(resultado.fechaFin);
     const diasprom = new Number(resultado.diasprom);
-/*
-    const documentosExistentes = await db.collection(historicoDemandaCollection).countDocuments({
-      Fecha: {
-        $gte: fechaInicioObj,
-        $lte: fechaFinObj
-      }
-    });
-*/
- 
 
+    writeToLog(`\tRango de fechas: ${fechaInicioObj.toISOString().split('T')[0]} a ${fechaFinObj.toISOString().split('T')[0]}`);
+    writeToLog(`\tDías promedio: ${diasprom}`);
+
+    // Verificar que existan datos en la colección fuente
+    const totalRegistros = await db.collection(historicoDemandaCollection).countDocuments();
+    if (totalRegistros === 0) {
+      writeToLog(`\tAdvertencia: No hay registros en ${historicoDemandaCollection}`);
+      return;
+    }
+
+    writeToLog(`\tTotal de registros en ${historicoDemandaCollection}: ${totalRegistros}`);
+
+    // Agregación para calcular la suma del error cuadrado por producto y ubicación
     const resultadosAgregados = await db.collection(historicoDemandaCollection).aggregate([
-<<<<<<< HEAD
-     {
-=======
-    /*  {
+      // Opcional: filtrar por rango de fechas si es necesario
+      /*{
         $match: {
           Fecha: {
             $gte: fechaInicioObj,
@@ -58,7 +58,6 @@ async function calcularPromedioErrorCuadrado() {
         }
       },*/
       {
->>>>>>> origin/test
         $group: {
           _id: {
             Producto: "$Producto", 
@@ -71,89 +70,117 @@ async function calcularPromedioErrorCuadrado() {
         $addFields: {
           Producto: "$_id.Producto",
           Ubicacion: "$_id.Ubicacion"
-
-          
         }
       }
     ]).toArray();
 
- /* 
-    const resultadosDivididos = resultadosAgregados.map(resultado => ({
-      Producto: resultado.Producto,
-      Ubicacion: resultado.Ubicacion,
-      Variabilidad_Demanda: resultado.Demanda_Costo / diasprom,
-    }));
-*/
+    writeToLog(`\tRegistros agrupados: ${resultadosAgregados.length}`);
+
+    if (resultadosAgregados.length === 0) {
+      writeToLog(`\tNo se encontraron datos para procesar`);
+      return;
+    }
+
+    // Calcular la variabilidad dividiendo por el número de semanas
+    const semanasPromedio = Math.ceil(diasprom / 7);
+    writeToLog(`\tSemanas promedio calculadas: ${semanasPromedio}`);
 
     const resultadosDivididos = resultadosAgregados.map(resultado => ({
       Producto: resultado.Producto,
       Ubicacion: resultado.Ubicacion,
-      Variabilidad_Demanda: resultado.Demanda_Costo / (Math.ceil(diasprom / 7)),
+      Variabilidad_Demanda: resultado.Demanda_Costo / semanasPromedio,
     }));
-<<<<<<< HEAD
-=======
-    console.log("Resultados Divididos:", JSON.stringify(resultadosDivididos, null, 2));
 
->>>>>>> origin/test
+    // Debug: mostrar algunos resultados
+    if (resultadosDivididos.length > 0) {
+      writeToLog(`\tEjemplo de cálculo - Primer registro:`);
+      writeToLog(`\t  Producto: ${resultadosDivididos[0].Producto}`);
+      writeToLog(`\t  Ubicación: ${resultadosDivididos[0].Ubicacion}`);
+      writeToLog(`\t  Variabilidad: ${resultadosDivididos[0].Variabilidad_Demanda}`);
+    }
 
-    const demandaAbcd01Collection = db.collection('demanda_abcd_01_sem'); 
+    const demandaAbcd01Coll = db.collection(demandaAbcd01Collection); 
 
+    // Actualizar registros existentes con la variabilidad calculada
+    let registrosActualizados = 0;
     for (const resultado of resultadosDivididos) {
-      await demandaAbcd01Collection.updateOne(
-        { Producto: resultado.Producto, Ubicacion: resultado.Ubicacion },
-        { $set: { Variabilidad_Demanda: resultado.Variabilidad_Demanda } }
+      const updateResult = await demandaAbcd01Coll.updateOne(
+        { 
+          Producto: resultado.Producto, 
+          Ubicacion: resultado.Ubicacion 
+        },
+        { 
+          $set: { 
+            Variabilidad_Demanda: resultado.Variabilidad_Demanda 
+          } 
+        }
       );
+      
+      if (updateResult.modifiedCount > 0) {
+        registrosActualizados++;
+      }
     }
-    //const formattedResult = JSON.stringify(resultadosDivididos, null, 2);
-    //writeToLog(formattedResult);
 
+    writeToLog(`\tRegistros actualizados con variabilidad: ${registrosActualizados}`);
 
+    // Crear identificadores para comparación
+    const productosUbicaciones = resultadosDivididos.map(resultado => 
+      `${resultado.Producto}@${resultado.Ubicacion}`
+    );
 
-    const productosUbicaciones = resultadosDivididos.map(resultado => `${resultado.Producto}@${resultado.Ubicacion}`);
-
-    
-    const skusNoEncontrados = await demandaAbcd01Collection.find({
-      SKU: { $nin: productosUbicaciones }
+    // Buscar SKUs que no fueron encontrados en los cálculos y establecer variabilidad = 0
+    const skusNoEncontrados = await demandaAbcd01Coll.find({
+      $expr: {
+        $not: {
+          $in: [
+            { $concat: ["$Producto", "@", "$Ubicacion"] },
+            productosUbicaciones
+          ]
+        }
+      }
     }).toArray();
-    
+
+    writeToLog(`\tSKUs sin datos de variabilidad: ${skusNoEncontrados.length}`);
+
+    let registrosSinVariabilidad = 0;
     for (const resultado2 of skusNoEncontrados) {
-      await demandaAbcd01Collection.updateOne(
-        { Producto: resultado2.Producto, Ubicacion: resultado2.Ubicacion },
-        { $set: { Variabilidad_Demanda: 0 } }
+      const updateResult = await demandaAbcd01Coll.updateOne(
+        { 
+          Producto: resultado2.Producto, 
+          Ubicacion: resultado2.Ubicacion 
+        },
+        { 
+          $set: { 
+            Variabilidad_Demanda: 0 
+          } 
+        }
       );
+      
+      if (updateResult.modifiedCount > 0) {
+        registrosSinVariabilidad++;
+      }
     }
 
-
-
-
+    writeToLog(`\tRegistros establecidos con variabilidad = 0: ${registrosSinVariabilidad}`);
     writeToLog(`\tTermina el Calculo de la Variabilidad de la Demanda por Semana`);
+    
     client.close();
   } catch (error) {
     writeToLog(`${now} - Error: ${error}`);
+    console.error('Error en calcularPromedioErrorCuadrado:', error);
   }
 }
 
-
-function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
-}
-
-
-// Llamar a la función para calcular el promedio y actualizar los datos
-calcularPromedioErrorCuadrado();
-
-
-
 async function CalculaRangoFechas(dbName) {
-  const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-//const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+  const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
   const client = new MongoClient(mongoUri);
 
   try {
     await client.connect();
-    const database = client.db(`${dbName}`);
+    const database = client.db(dbName);
     const tabla = database.collection('parametros_usuario');
 
+    // Obtener horizonte histórico en días
     const pipeline = [
       {
         $match: {
@@ -170,9 +197,13 @@ async function CalculaRangoFechas(dbName) {
     ];
 
     const resultados = await tabla.aggregate(pipeline).toArray();
-    const valores = resultados.map(resultado => resultado.Horizonte_Historico_dias);
-    const diasAtras = valores.join(', ');
+    if (resultados.length === 0) {
+      throw new Error('No se encontró el parámetro Horizonte_Historico_dias');
+    }
+    
+    const diasAtras = resultados[0].Horizonte_Historico_dias;
 
+    // Obtener fecha fin del horizonte
     const pipeline2 = [
       {
         $match: {
@@ -189,9 +220,13 @@ async function CalculaRangoFechas(dbName) {
     ];
 
     const resultados2 = await tabla.aggregate(pipeline2).toArray();
-    const valores2 = resultados2.map(resultado2 => resultado2.Fecha_Fin_Horizonte);
-    const FechaFinHorizonte = valores2.join(', ');
+    if (resultados2.length === 0) {
+      throw new Error('No se encontró el parámetro Fecha_Fin_Horizonte');
+    }
+    
+    const FechaFinHorizonte = resultados2[0].Fecha_Fin_Horizonte;
 
+    // Calcular fechas
     const fechaInicio = new Date(FechaFinHorizonte);
     const fechaFin = new Date(FechaFinHorizonte);
     const diasprom = new Number(diasAtras);
@@ -201,7 +236,16 @@ async function CalculaRangoFechas(dbName) {
     return { fechaInicio, fechaFin, diasprom };
   } catch (error) {
     console.error('Error al consultar la tabla:', error);
+    throw error;
   } finally {
-    client.close();
+    await client.close();
   }
 }
+
+function writeToLog(message) {
+  const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+  fs.appendFileSync(logFile, `${timestamp} - ${message}\n`);
+}
+
+// Ejecutar la función principal
+calcularPromedioErrorCuadrado();

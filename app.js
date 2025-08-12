@@ -3944,7 +3944,7 @@ app.get('/logs', async (req, res) => {
 
 
 // Endpoint siguiendo el patrón de los endpoints que funcionan
-app.post('/getPoliticasGuardadas', async (req, res) => {
+/*app.post('/getPoliticasGuardadas', async (req, res) => {
 
   let client;
 
@@ -4020,7 +4020,7 @@ app.post('/getPoliticasGuardadas', async (req, res) => {
       client.close();
     }
   }
-});
+});*/
 
 // FUNCIÓN PARA LIMPIAR OBJETOS PROBLEMÁTICOS
 function cleanObjectForJson(obj) {
@@ -4063,7 +4063,7 @@ function cleanObjectForJson(obj) {
   return obj;
 }
 
-app.post('/runUsoPoliticaGuardada', async (req, res) => {
+/*app.post('/runUsoPoliticaGuardada', async (req, res) => {
   try {
     const { appUser, appPass, DBName, idPolitica, modoUso, comentario } = req.body;
 
@@ -4101,7 +4101,7 @@ app.post('/runUsoPoliticaGuardada', async (req, res) => {
     console.error('[runUsoPoliticaGuardada] Error general:', err);
     res.status(500).send('Error interno al procesar uso de política guardada');
   }
-});
+});*/
 
 app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
   try {
@@ -4115,7 +4115,7 @@ app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
     const client = conex.getClient(); // ✅ obtenemos el cliente
     const db = client.db('btc_opti_' + DBName); // ✅ obtenemos la instancia correcta de la base de datos
 
-    const colecciones = ['ubis_saved', 'politica_inventarios_01'];
+    const colecciones = ['ubis_saved', 'politica_inventarios_01','ui_all_pol_inv'];
     const resultados = [];
 
     for (const nombre of colecciones) {
