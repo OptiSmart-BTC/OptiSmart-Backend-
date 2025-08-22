@@ -14,6 +14,7 @@ const { DBUser, DBPassword, DBName } = require(`../../${parametroFolder}/cfg/dbv
 const dbName = `btc_opti_${DBName}`;
 
 const POL_COLL = process.env.POL_COLL || 'politica_inventarios_01';
+const UI_ALL_POL_INV_COLL = process.env.UI_ALL_POL_INV_COLL || 'ui_all_pol_inv';
 const CAMBIOS_COLL = process.env.CAMBIOS_COLL || 'cambios_ubicaciones_temp';
 
 const logFileName = 'Incremental_Only';
@@ -77,6 +78,23 @@ async function backupPolitica(db) {
   return backupName;
 }
 
+async function backupUiAllPolInv(db) {
+  const backupName = `${UI_ALL_POL_INV_COLL}_bk_${moment().format('YYYYMMDD_HHmmss')}`;
+  const uiAll = db.collection(UI_ALL_POL_INV_COLL);
+  const count = await uiAll.estimatedDocumentCount();
+  
+  if (count === 0) {
+    writeToLog(` ${UI_ALL_POL_INV_COLL} está vacía. No se crea respaldo.`);
+    return null;
+  }
+  
+  writeToLog(` Creando respaldo de ${UI_ALL_POL_INV_COLL} (${count} docs) en ${backupName}...`);
+  // Copia completa usando $out
+  await uiAll.aggregate([{ $match: {} }, { $out: backupName }], { allowDiskUse: true }).toArray();
+  writeToLog(` Respaldo creado: ${backupName} con ${count} documentos`);
+  return backupName;
+}
+
 async function mergeBackupToPolitica(db, backupName) {
   if (!backupName) {
     writeToLog(` No hay respaldo que fusionar.`);
@@ -85,6 +103,19 @@ async function mergeBackupToPolitica(db, backupName) {
 
   const pol = db.collection(POL_COLL);
   const backup = db.collection(backupName);
+  const cambiosCollection = db.collection(CAMBIOS_COLL);
+  
+  // *** NUEVA LÓGICA: OBTENER UBICACIONES RECARGADAS ***
+  const ubicacionesRecargadas = await cambiosCollection.find({
+    tipo_cambio: 'RECARGA'
+  }).toArray();
+  
+  const ubicacionesRecaradasList = ubicacionesRecargadas.map(r => r.ubicacion);
+  
+  if (ubicacionesRecaradasList.length > 0) {
+    writeToLog(` ADVERTENCIA: EXCLUIR del merge ubicaciones recargadas: [${ubicacionesRecaradasList.join(', ')}]`);
+    writeToLog(`   Estas ubicaciones fueron limpiadas y recalculadas desde cero`);
+  }
   
   // Contar documentos antes del merge
   const countPoliticaBefore = await pol.estimatedDocumentCount();
@@ -94,10 +125,14 @@ async function mergeBackupToPolitica(db, backupName) {
   writeToLog(` Documentos en ${POL_COLL} antes del merge: ${countPoliticaBefore}`);
   writeToLog(` Documentos en backup: ${countBackup}`);
 
-  // Insertar todos los documentos del backup a la colección principal
-  // Esto agregará los datos del backup sin eliminar los nuevos datos calculados
+  // *** MODIFICACIÓN: EXCLUIR UBICACIONES RECARGADAS DEL MERGE ***
+  const matchStage = ubicacionesRecaradasList.length > 0 
+    ? { $match: { Ubicacion: { $nin: ubicacionesRecaradasList } } }
+    : { $match: {} };
+
+  // Insertar documentos del backup EXCLUYENDO ubicaciones recargadas
   await backup.aggregate([
-    { $match: {} },
+    matchStage,
     { $merge: {
         into: POL_COLL,
         whenMatched: 'keepExisting', // Mantener los nuevos datos si hay conflicto
@@ -110,8 +145,88 @@ async function mergeBackupToPolitica(db, backupName) {
   const countPoliticaAfter = await pol.estimatedDocumentCount();
   const docsAgregados = countPoliticaAfter - countPoliticaBefore;
   
+  if (ubicacionesRecaradasList.length > 0) {
+    // Verificar que las ubicaciones recargadas NO tengan datos del backup
+    const docsRecaradasEnBackup = await backup.countDocuments({
+      Ubicacion: { $in: ubicacionesRecaradasList }
+    });
+    
+    writeToLog(` VERIFICACION EXITOSA: ${docsRecaradasEnBackup} docs de ubicaciones recargadas EXCLUIDOS del merge`);
+  }
+  
   writeToLog(` Merge completado. Documentos agregados del backup: ${docsAgregados}`);
   writeToLog(` Total de documentos en ${POL_COLL} después del merge: ${countPoliticaAfter}`);
+  
+  if (ubicacionesRecaradasList.length > 0) {
+    writeToLog(` RECARGAS: Ubicaciones recargadas mantienen solo sus datos nuevos (sin merge)`);
+  }
+}
+
+async function mergeBackupToUiAllPolInv(db, backupName) {
+  if (!backupName) {
+    writeToLog(` No hay respaldo de ${UI_ALL_POL_INV_COLL} que fusionar.`);
+    return;
+  }
+
+  const uiAll = db.collection(UI_ALL_POL_INV_COLL);
+  const backup = db.collection(backupName);
+  const cambiosCollection = db.collection(CAMBIOS_COLL);
+  
+  // *** NUEVA LÓGICA: OBTENER UBICACIONES RECARGADAS ***
+  const ubicacionesRecargadas = await cambiosCollection.find({
+    tipo_cambio: 'RECARGA'
+  }).toArray();
+  
+  const ubicacionesRecaradasList = ubicacionesRecargadas.map(r => r.ubicacion);
+  
+  if (ubicacionesRecaradasList.length > 0) {
+    writeToLog(` ADVERTENCIA: EXCLUIR del merge ${UI_ALL_POL_INV_COLL} ubicaciones recargadas: [${ubicacionesRecaradasList.join(', ')}]`);
+    writeToLog(`   Estas ubicaciones fueron limpiadas y recalculadas desde cero`);
+  }
+  
+  // Contar documentos antes del merge
+  const countUiAllBefore = await uiAll.estimatedDocumentCount();
+  const countBackup = await backup.estimatedDocumentCount();
+  
+  writeToLog(` Fusionando datos del backup ${backupName} con ${UI_ALL_POL_INV_COLL}...`);
+  writeToLog(` Documentos en ${UI_ALL_POL_INV_COLL} antes del merge: ${countUiAllBefore}`);
+  writeToLog(` Documentos en backup: ${countBackup}`);
+
+  // *** MODIFICACIÓN: EXCLUIR UBICACIONES RECARGADAS DEL MERGE ***
+  const matchStage = ubicacionesRecaradasList.length > 0 
+    ? { $match: { Ubicacion: { $nin: ubicacionesRecaradasList } } }
+    : { $match: {} };
+
+  // Insertar documentos del backup EXCLUYENDO ubicaciones recargadas
+  await backup.aggregate([
+    matchStage,
+    { $merge: {
+        into: UI_ALL_POL_INV_COLL,
+        whenMatched: 'keepExisting', // Mantener los nuevos datos si hay conflicto
+        whenNotMatched: 'insert'     // Insertar los datos del backup que no existan
+      }
+    }
+  ], { allowDiskUse: true }).toArray();
+
+  // Contar documentos después del merge
+  const countUiAllAfter = await uiAll.estimatedDocumentCount();
+  const docsAgregados = countUiAllAfter - countUiAllBefore;
+  
+  if (ubicacionesRecaradasList.length > 0) {
+    // Verificar que las ubicaciones recargadas NO tengan datos del backup
+    const docsRecaradasEnBackup = await backup.countDocuments({
+      Ubicacion: { $in: ubicacionesRecaradasList }
+    });
+    
+    writeToLog(` VERIFICACION EXITOSA: ${docsRecaradasEnBackup} docs de ubicaciones recargadas EXCLUIDOS del merge en ${UI_ALL_POL_INV_COLL}`);
+  }
+  
+  writeToLog(` Merge completado. Documentos agregados del backup: ${docsAgregados}`);
+  writeToLog(` Total de documentos en ${UI_ALL_POL_INV_COLL} después del merge: ${countUiAllAfter}`);
+  
+  if (ubicacionesRecaradasList.length > 0) {
+    writeToLog(` RECARGAS: Ubicaciones recargadas mantienen solo sus datos nuevos (sin merge)`);
+  }
 }
 
 async function restorePolitica(db, backupName) {
@@ -153,32 +268,94 @@ async function restorePolitica(db, backupName) {
   writeToLog(` Restauración terminada. ${POL_COLL} quedó idéntica al respaldo.`);
 }
 
+async function restoreUiAllPolInv(db, backupName) {
+  if (!backupName) {
+    writeToLog(` No hay respaldo de ${UI_ALL_POL_INV_COLL} que restaurar.`);
+    return;
+  }
+  writeToLog(` Restaurando ${UI_ALL_POL_INV_COLL} desde ${backupName}...`);
+  
+  // Restaura: reemplaza coincidencias por _id y crea si no existe
+  await db.collection(backupName).aggregate([
+    { $match: {} },
+    {
+      $merge: {
+        into: UI_ALL_POL_INV_COLL,
+        whenMatched: 'replace',
+        whenNotMatched: 'insert'
+      }
+    }
+  ], { allowDiskUse: true }).toArray();
+
+  // Elimina documentos "extra" que se hayan creado durante el proceso y no estén en el respaldo
+  const idsBackup = await db.collection(backupName).find({}, { projection: { _id: 1 } }).toArray();
+  const idSet = new Set(idsBackup.map(d => String(d._id)));
+  
+  // Borra en lotes para no cargar todo en memoria en colecciones enormes
+  const cursor = db.collection(UI_ALL_POL_INV_COLL).find({}, { projection: { _id: 1 } });
+  const toDelete = [];
+  while (await cursor.hasNext()) {
+    const doc = await cursor.next();
+    if (!idSet.has(String(doc._id))) toDelete.push(doc._id);
+    if (toDelete.length >= 5000) {
+      await db.collection(UI_ALL_POL_INV_COLL).deleteMany({ _id: { $in: toDelete.splice(0, toDelete.length) } });
+    }
+  }
+  if (toDelete.length) {
+    await db.collection(UI_ALL_POL_INV_COLL).deleteMany({ _id: { $in: toDelete } });
+  }
+  writeToLog(` Restauración terminada. ${UI_ALL_POL_INV_COLL} quedó idéntica al respaldo.`);
+}
+
 async function eliminarDuplicadosDeEjecucion(db, inicioEjecucion) {
   writeToLog(` \nINICIANDO ELIMINACIÓN DE DUPLICADOS...`);
   
   try {
     const pol = db.collection(POL_COLL);
+    const cambiosCollection = db.collection(CAMBIOS_COLL);
     
-    // 1. Identificar documentos creados durante esta ejecución
-    const docsNuevos = await pol.find({
-      created_at: { $gte: inicioEjecucion }
+    // *** NUEVA LÓGICA: NO TOCAR UBICACIONES RECARGADAS ***
+    const recargas = await cambiosCollection.find({
+      tipo_cambio: 'RECARGA'
     }).toArray();
     
+    const ubicacionesRecargadas = recargas.map(r => r.ubicacion);
+    
+    if (recargas.length > 0) {
+      writeToLog(` RECARGAS DETECTADAS - SALTANDO limpieza (ya procesadas por P24):`);
+      for (const recarga of recargas) {
+        writeToLog(`   RECARGA ${recarga.ubicacion}: Ya limpiada por P24 - NO TOCAR`);
+      }
+    }
+    
+    // 1. Identificar documentos creados durante esta ejecución (EXCLUYENDO UBICACIONES RECARGADAS)
+    const matchFilter = {
+      created_at: { $gte: inicioEjecucion },
+      // *** EXCLUIR UBICACIONES RECARGADAS ***
+      ...(ubicacionesRecargadas.length > 0 && {
+        Ubicacion: { $nin: ubicacionesRecargadas }
+      })
+    };
+    
+    const docsNuevos = await pol.find(matchFilter).toArray();
+    
     if (docsNuevos.length === 0) {
-      writeToLog(` No hay documentos nuevos con timestamp de esta ejecución`);
+      writeToLog(` No hay documentos nuevos con timestamp de esta ejecución (excluyendo recargas)`);
       return;
     }
     
-    writeToLog(` Documentos creados en esta ejecución: ${docsNuevos.length}`);
+    writeToLog(` Documentos creados en esta ejecución (excluyendo recargas): ${docsNuevos.length}`);
     
-    // 2. Encontrar duplicados basados en campos de negocio
+    // 2. Encontrar duplicados basados en campos de negocio (SOLO EN DOCUMENTOS NUEVOS NO-RECARGADOS)
     const pipeline = [
+      {
+        $match: matchFilter
+      },
       {
         $group: {
           _id: {
             SKU: "$SKU",
             Ubicacion: "$Ubicacion"
-            // Agrega aquí otros campos que definan unicidad
           },
           docs: { $push: "$$ROOT" },
           count: { $sum: 1 }
@@ -192,11 +369,11 @@ async function eliminarDuplicadosDeEjecucion(db, inicioEjecucion) {
     const duplicados = await pol.aggregate(pipeline).toArray();
     
     if (duplicados.length === 0) {
-      writeToLog(` No se encontraron duplicados en la colección`);
+      writeToLog(` No se encontraron duplicados en documentos nuevos (excluyendo recargas)`);
       return;
     }
     
-    writeToLog(` Grupos de duplicados encontrados: ${duplicados.length}`);
+    writeToLog(` Grupos de duplicados encontrados (sin recargas): ${duplicados.length}`);
     
     let totalEliminados = 0;
     
@@ -204,24 +381,15 @@ async function eliminarDuplicadosDeEjecucion(db, inicioEjecucion) {
     for (const grupo of duplicados) {
       const docs = grupo.docs;
       
-      // Filtrar solo documentos creados en esta ejecución
-      const docsDeEstaEjecucion = docs.filter(doc => 
-        doc.created_at && doc.created_at >= inicioEjecucion
-      );
-      
-      if (docsDeEstaEjecucion.length <= 1) {
-        continue;
-      }
-      
       // Ordenar por created_at descendente (más reciente primero)
-      docsDeEstaEjecucion.sort((a, b) => {
+      docs.sort((a, b) => {
         const dateA = new Date(a.created_at || a._id.getTimestamp());
         const dateB = new Date(b.created_at || b._id.getTimestamp());
         return dateB - dateA;
       });
       
       // Mantener el primer documento (más reciente), eliminar el resto
-      const docsAEliminar = docsDeEstaEjecucion.slice(1);
+      const docsAEliminar = docs.slice(1);
       const idsAEliminar = docsAEliminar.map(doc => doc._id);
       
       if (idsAEliminar.length > 0) {
@@ -232,15 +400,121 @@ async function eliminarDuplicadosDeEjecucion(db, inicioEjecucion) {
       }
     }
     
-    writeToLog(` TOTAL DUPLICADOS ELIMINADOS: ${totalEliminados}`);
+    writeToLog(` TOTAL DUPLICADOS ELIMINADOS (excluyendo recargas): ${totalEliminados}`);
     
     if (totalEliminados > 0) {
       const countFinal = await pol.countDocuments({});
-      writeToLog(` Documentos restantes en ${POL_COLL}: ${countFinal}`);
+      writeToLog(` Documentos finales en ${POL_COLL}: ${countFinal}`);
     }
     
   } catch (error) {
     writeToLog(` Error eliminando duplicados: ${error.message}`);
+    throw error;
+  }
+}
+
+async function eliminarDuplicadosUiAllPolInv(db, inicioEjecucion) {
+  writeToLog(` \nINICIANDO ELIMINACIÓN DE DUPLICADOS EN ${UI_ALL_POL_INV_COLL}...`);
+  
+  try {
+    const uiAll = db.collection(UI_ALL_POL_INV_COLL);
+    const cambiosCollection = db.collection(CAMBIOS_COLL);
+    
+    // *** NUEVA LÓGICA: NO TOCAR UBICACIONES RECARGADAS ***
+    const recargas = await cambiosCollection.find({
+      tipo_cambio: 'RECARGA'
+    }).toArray();
+    
+    const ubicacionesRecargadas = recargas.map(r => r.ubicacion);
+    
+    if (recargas.length > 0) {
+      writeToLog(` RECARGAS DETECTADAS EN ${UI_ALL_POL_INV_COLL} - SALTANDO limpieza (ya procesadas por P24):`);
+      for (const recarga of recargas) {
+        writeToLog(`   RECARGA ${recarga.ubicacion}: Ya limpiada por P24 - NO TOCAR`);
+      }
+    }
+    
+    // 1. Identificar documentos creados durante esta ejecución (EXCLUYENDO UBICACIONES RECARGADAS)
+    const matchFilter = {
+      created_at: { $gte: inicioEjecucion },
+      // *** EXCLUIR UBICACIONES RECARGADAS ***
+      ...(ubicacionesRecargadas.length > 0 && {
+        Ubicacion: { $nin: ubicacionesRecargadas }
+      })
+    };
+    
+    const docsNuevos = await uiAll.find(matchFilter).toArray();
+    
+    if (docsNuevos.length === 0) {
+      writeToLog(` No hay documentos nuevos en ${UI_ALL_POL_INV_COLL} con timestamp de esta ejecución (excluyendo recargas)`);
+      return;
+    }
+    
+    writeToLog(` Documentos creados en ${UI_ALL_POL_INV_COLL} en esta ejecución (excluyendo recargas): ${docsNuevos.length}`);
+    
+    // 2. Encontrar duplicados basados en campos de negocio (SOLO EN DOCUMENTOS NUEVOS NO-RECARGADOS)
+    const pipeline = [
+      {
+        $match: matchFilter
+      },
+      {
+        $group: {
+          _id: {
+            SKU: "$SKU",
+            Ubicacion: "$Ubicacion"
+          },
+          docs: { $push: "$$ROOT" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $match: { count: { $gt: 1 } }
+      }
+    ];
+    
+    const duplicados = await uiAll.aggregate(pipeline).toArray();
+    
+    if (duplicados.length === 0) {
+      writeToLog(` No se encontraron duplicados en ${UI_ALL_POL_INV_COLL} documentos nuevos (excluyendo recargas)`);
+      return;
+    }
+    
+    writeToLog(` Grupos de duplicados encontrados en ${UI_ALL_POL_INV_COLL} (sin recargas): ${duplicados.length}`);
+    
+    let totalEliminados = 0;
+    
+    // 3. Para cada grupo de duplicados, mantener solo el más reciente
+    for (const grupo of duplicados) {
+      const docs = grupo.docs;
+      
+      // Ordenar por created_at descendente (más reciente primero)
+      docs.sort((a, b) => {
+        const dateA = new Date(a.created_at || a._id.getTimestamp());
+        const dateB = new Date(b.created_at || b._id.getTimestamp());
+        return dateB - dateA;
+      });
+      
+      // Mantener el primer documento (más reciente), eliminar el resto
+      const docsAEliminar = docs.slice(1);
+      const idsAEliminar = docsAEliminar.map(doc => doc._id);
+      
+      if (idsAEliminar.length > 0) {
+        const resultado = await uiAll.deleteMany({ _id: { $in: idsAEliminar } });
+        totalEliminados += resultado.deletedCount;
+        
+        writeToLog(` Eliminados ${resultado.deletedCount} duplicados en ${UI_ALL_POL_INV_COLL} para SKU: ${grupo._id.SKU}, Ubicacion: ${grupo._id.Ubicacion}`);
+      }
+    }
+    
+    writeToLog(` TOTAL DUPLICADOS ELIMINADOS EN ${UI_ALL_POL_INV_COLL} (excluyendo recargas): ${totalEliminados}`);
+    
+    if (totalEliminados > 0) {
+      const countFinal = await uiAll.countDocuments({});
+      writeToLog(` Documentos finales en ${UI_ALL_POL_INV_COLL}: ${countFinal}`);
+    }
+    
+  } catch (error) {
+    writeToLog(` Error eliminando duplicados en ${UI_ALL_POL_INV_COLL}: ${error.message}`);
     throw error;
   }
 }
@@ -261,7 +535,8 @@ async function limpiarBackupTemporal(db, backupName) {
 
 async function ejecutarIncrementalSolo() {
   let client;
-  let backupName = null;
+  let backupNamePolitica = null;
+  let backupNameUiAll = null;
   const inicioEjecucion = new Date();
   const t0 = Date.now();
   let procesoExitoso = false;
@@ -279,9 +554,10 @@ async function ejecutarIncrementalSolo() {
     writeToLog(` Conectado a Mongo. Node=${process.version} Driver=${require('mongodb/package.json').version}`);
     writeToLog(` Inicio de ejecución marcado: ${inicioEjecucion.toISOString()}`);
 
-    // 1) BACKUP OBLIGATORIO antes de cualquier procesamiento
-    writeToLog(` \n========== CREANDO BACKUP INICIAL ==========`);
-    backupName = await backupPolitica(db);
+    // 1) BACKUPS OBLIGATORIOS antes de cualquier procesamiento
+    writeToLog(` \n========== CREANDO BACKUPS INICIALES ==========`);
+    backupNamePolitica = await backupPolitica(db);
+    backupNameUiAll = await backupUiAllPolInv(db);
 
     // 2) FLUJO DE EJECUCIÓN SECUENCIAL
     writeToLog(` \n========== INICIANDO FLUJO INCREMENTAL ==========`);
@@ -300,27 +576,31 @@ async function ejecutarIncrementalSolo() {
       return;
     }
 
-    // PASO 3: Ejecutar P24 (Procesar cambios incrementales)
-    writeToLog(` \nPASO 2: Procesando cambios incrementales...`);
+    // PASO 3: Ejecutar P24 (Procesar cambios incrementales) - P24 ejecuta P22 internamente
+    writeToLog(` \nPASO 2: Procesando cambios incrementales (incluye P22)...`);
     await ejecutarArchivo('P24_Procesa_Cambios_Incrementales.js', parametros);
 
-    // PASO 4: Ejecutar P22 (Crear política final)
-    writeToLog(` \nPASO 3: Ejecutando creación de política final...`);
-    await ejecutarArchivo('P22_Crea_Politica_Final.js', parametros);
-
-    // PASO 5: Eliminar duplicados creados durante esta ejecución
-    writeToLog(` \nPASO 4: Verificando y eliminando duplicados de esta ejecución...`);
+    // PASO 4: Eliminar duplicados creados durante esta ejecución (SIN TOCAR RECARGAS) - AMBAS COLECCIONES
+    writeToLog(` \nPASO 3: Verificando y eliminando duplicados de esta ejecución...`);
     await eliminarDuplicadosDeEjecucion(db, inicioEjecucion);
+    await eliminarDuplicadosUiAllPolInv(db, inicioEjecucion);
 
-    // PASO 6: FUSIONAR DATOS DEL BACKUP CON LOS NUEVOS DATOS
-    writeToLog(` \n========== FUSIONANDO DATOS DEL BACKUP ==========`);
-    await mergeBackupToPolitica(db, backupName);
+    // PASO 5: FUSIONAR DATOS DE LOS BACKUPS CON LOS NUEVOS DATOS - AMBAS COLECCIONES
+    writeToLog(` \n========== FUSIONANDO DATOS DE LOS BACKUPS ==========`);
+    await mergeBackupToPolitica(db, backupNamePolitica);
+    await mergeBackupToUiAllPolInv(db, backupNameUiAll);
 
-    // PASO 7: ELIMINAR BACKUP INMEDIATAMENTE DESPUÉS DEL MERGE EXITOSO
-    if (backupName) {
-      writeToLog(` \nEliminando backup temporal después del merge exitoso...`);
-      await limpiarBackupTemporal(db, backupName);
-      backupName = null; // Marcamos que ya no existe el backup
+    // PASO 6: ELIMINAR BACKUPS INMEDIATAMENTE DESPUÉS DEL MERGE EXITOSO
+    if (backupNamePolitica) {
+      writeToLog(` \nEliminando backup temporal de ${POL_COLL} después del merge exitoso...`);
+      await limpiarBackupTemporal(db, backupNamePolitica);
+      backupNamePolitica = null; // Marcamos que ya no existe el backup
+    }
+    
+    if (backupNameUiAll) {
+      writeToLog(` \nEliminando backup temporal de ${UI_ALL_POL_INV_COLL} después del merge exitoso...`);
+      await limpiarBackupTemporal(db, backupNameUiAll);
+      backupNameUiAll = null; // Marcamos que ya no existe el backup
     }
 
     writeToLog(` \n========== FLUJO INCREMENTAL COMPLETADO ==========`);
@@ -331,28 +611,53 @@ async function ejecutarIncrementalSolo() {
   } catch (error) {
     writeToLog(` Error en ejecutarIncrementalSolo: ${error?.message || error}`);
     
-    // En caso de error, restaurar desde backup (solo si aún existe)
-    if (client && backupName) {
-      writeToLog(` \nError detectado - Iniciando restauración desde backup...`);
-      try {
-        const db = client.db(dbName);
-        await restorePolitica(db, backupName);
-        writeToLog(` Restauración completada debido a error en la ejecución`);
-      } catch (restoreError) {
-        writeToLog(` Error durante la restauración: ${restoreError.message}`);
+    // En caso de error, restaurar desde backups (solo si aún existen)
+    if (client) {
+      const db = client.db(dbName);
+      
+      if (backupNamePolitica) {
+        writeToLog(` \nError detectado - Iniciando restauración de ${POL_COLL} desde backup...`);
+        try {
+          await restorePolitica(db, backupNamePolitica);
+          writeToLog(` Restauración de ${POL_COLL} completada debido a error en la ejecución`);
+        } catch (restoreError) {
+          writeToLog(` Error durante la restauración de ${POL_COLL}: ${restoreError.message}`);
+        }
+      }
+      
+      if (backupNameUiAll) {
+        writeToLog(` \nError detectado - Iniciando restauración de ${UI_ALL_POL_INV_COLL} desde backup...`);
+        try {
+          await restoreUiAllPolInv(db, backupNameUiAll);
+          writeToLog(` Restauración de ${UI_ALL_POL_INV_COLL} completada debido a error en la ejecución`);
+        } catch (restoreError) {
+          writeToLog(` Error durante la restauración de ${UI_ALL_POL_INV_COLL}: ${restoreError.message}`);
+        }
       }
     }
     
     throw error;
   } finally {
-    // 7) LIMPIEZA FINAL: Eliminar backup temporal solo si aún existe y hubo error
-    if (client && backupName && !procesoExitoso) {
-      try {
-        const db = client.db(dbName);
-        writeToLog(` Limpiando backup temporal debido a proceso fallido...`);
-        await limpiarBackupTemporal(db, backupName);
-      } catch (e) {
-        writeToLog(` Error eliminando backup temporal en cleanup final: ${e.message}`);
+    // 7) LIMPIEZA FINAL: Eliminar backups temporales solo si aún existen y hubo error
+    if (client && !procesoExitoso) {
+      const db = client.db(dbName);
+      
+      if (backupNamePolitica) {
+        try {
+          writeToLog(` Limpiando backup temporal de ${POL_COLL} debido a proceso fallido...`);
+          await limpiarBackupTemporal(db, backupNamePolitica);
+        } catch (e) {
+          writeToLog(` Error eliminando backup temporal de ${POL_COLL} en cleanup final: ${e.message}`);
+        }
+      }
+      
+      if (backupNameUiAll) {
+        try {
+          writeToLog(` Limpiando backup temporal de ${UI_ALL_POL_INV_COLL} debido a proceso fallido...`);
+          await limpiarBackupTemporal(db, backupNameUiAll);
+        } catch (e) {
+          writeToLog(` Error eliminando backup temporal de ${UI_ALL_POL_INV_COLL} en cleanup final: ${e.message}`);
+        }
       }
     }
     

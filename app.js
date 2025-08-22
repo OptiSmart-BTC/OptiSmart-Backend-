@@ -4112,10 +4112,10 @@ app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
     await conex.connectToDatabase();
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
 
-    const client = conex.getClient(); // ✅ obtenemos el cliente
-    const db = client.db('btc_opti_' + DBName); // ✅ obtenemos la instancia correcta de la base de datos
+    const client = conex.getClient(); // 
+    const db = client.db('btc_opti_' + DBName); // 
 
-    const colecciones = ['ubis_saved', 'politica_inventarios_01','ui_all_pol_inv'];
+    const colecciones = ['ubis_saved', 'politica_inventarios_01','ui_all_pol_inv','cambios_ubicaciones_temp'];
     const resultados = [];
 
     for (const nombre of colecciones) {

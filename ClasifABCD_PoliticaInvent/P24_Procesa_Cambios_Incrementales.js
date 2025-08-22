@@ -45,8 +45,8 @@ async function procesaCambiosIncrementales() {
         const cambiosCollection = db.collection('cambios_ubicaciones_temp');
         const skuCollection = db.collection('sku');
 
-        // *** VERIFICAR SI P24 YA SE EJECUTÓ PARA ESTOS CAMBIOS ***
-        const yaEjecutado = await verificarSiYaSeEjecuto(db);
+        // VERIFICAR SI P24 YA SE EJECUTÓ PARA ESTOS CAMBIOS (CON RECARGAS)
+        const yaEjecutado = await verificarSiYaSeEjecutoConRecargas(db);
         if (yaEjecutado) {
             writeToLog(`P24 YA EJECUTADO PARA ESTOS CAMBIOS - SALTANDO`);
             console.log('P24: Ya ejecutado para estos cambios');
@@ -65,14 +65,31 @@ async function procesaCambiosIncrementales() {
             return;
         }
 
-        // FILTRAR UBICACIONES
+        // FILTRAR UBICACIONES INCLUYENDO RECARGAS
         const ubicacionesAProcesar = cambiosPendientes
-            .filter(c => c.tipo_cambio === 'NUEVA' || c.tipo_cambio === 'ACTUALIZADA')
+            .filter(c => 
+                c.tipo_cambio === 'NUEVA' || 
+                c.tipo_cambio === 'ACTUALIZADA' || 
+                c.tipo_cambio === 'RECARGA'
+            )
             .map(c => c.ubicacion);
 
         const ubicacionesAEliminar = cambiosPendientes
             .filter(c => c.tipo_cambio === 'ELIMINADA')
             .map(c => c.ubicacion);
+
+        // LOGGING ESPECÍFICO PARA RECARGAS
+        const recargas = cambiosPendientes.filter(c => c.tipo_cambio === 'RECARGA');
+        if (recargas.length > 0) {
+            writeToLog(`RECARGAS DETECTADAS EN P24:`);
+            writeToLog(`   ${recargas.length} ubicaciones recargadas para procesar`);
+            for (const recarga of recargas) {
+                writeToLog(`   ${recarga.ubicacion}: ${recarga.razon_recarga || 'Recarga detectada'}`);
+                if (recarga.detalles_recarga) {
+                    writeToLog(`      ${recarga.detalles_recarga}`);
+                }
+            }
+        }
 
         writeToLog(`Ubicaciones a procesar: ${ubicacionesAProcesar.length} [${ubicacionesAProcesar.join(', ')}]`);
         writeToLog(`Ubicaciones a eliminar: ${ubicacionesAEliminar.length} [${ubicacionesAEliminar.join(', ')}]`);
@@ -82,13 +99,21 @@ async function procesaCambiosIncrementales() {
             return;
         }
 
-        // *** MARCAR INICIO DE PROCESAMIENTO P24 ***
+        // MARCAR INICIO DE PROCESAMIENTO P24
         await marcarInicioProcesamientoP24(db, ubicacionesAProcesar, ubicacionesAEliminar);
 
         // PASO 1: PROCESAR ELIMINACIONES
         if (ubicacionesAEliminar.length > 0) {
             writeToLog(`\nPROCESANDO ELIMINACIONES...`);
             await procesarEliminaciones(db, ubicacionesAEliminar);
+        }
+
+        // PASO ESPECIAL: PROCESAR RECARGAS
+        const recargasDetectadas = cambiosPendientes.filter(c => c.tipo_cambio === 'RECARGA');
+        if (recargasDetectadas.length > 0) {
+            const ubicacionesConRecargas = recargasDetectadas.map(c => c.ubicacion);
+            writeToLog(`\nPROCESANDO RECARGAS ESPECIALES...`);
+            await procesarRecargasEspeciales(db, ubicacionesConRecargas);
         }
 
         // PASO 2: VERIFICAR SKUs PARA LAS UBICACIONES NUEVAS
@@ -112,7 +137,7 @@ async function procesaCambiosIncrementales() {
                 console.log('P24: No hay SKUs válidos para procesar');
                 
                 if (ubicacionesAEliminar.length > 0) {
-                    await marcarCambiosComoProcesados(db);
+                    await marcarCambiosComoProcesadosConCoordinacionConRecargas(db, []);
                 }
                 return;
             }
@@ -141,21 +166,24 @@ async function procesaCambiosIncrementales() {
             }
         }
 
-        // *** CAMBIO CRÍTICO: MARCAR COMO PROCESADOS CON MEJOR COORDINACIÓN ***
-        await marcarCambiosComoProcesadosConCoordinacion(db, ubicacionesAProcesar);
+        // CAMBIO CRÍTICO: MARCAR COMO PROCESADOS CON MEJOR COORDINACIÓN Y RECARGAS
+        await marcarCambiosComoProcesadosConCoordinacionConRecargas(db, ubicacionesAProcesar);
 
-        // *** MARCAR ESTADO INCREMENTAL COMPLETADO CON COORDINACIÓN P22 ***
+        // MARCAR ESTADO INCREMENTAL COMPLETADO CON COORDINACIÓN P22
         await marcarEstadoIncrementalCompletadoConCoordinacion(db, ubicacionesAProcesar);
 
-        // *** VERIFICAR SI P22 DEBE EJECUTARSE ***
+        // VERIFICAR SI P22 DEBE EJECUTARSE
         await verificarYPrepararP22(db, ubicacionesAProcesar);
 
         writeToLog(`P24 COMPLETADO EXITOSAMENTE`);
         writeToLog(`Ubicaciones procesadas: ${ubicacionesAProcesar.length}`);
         writeToLog(`Ubicaciones eliminadas: ${ubicacionesAEliminar.length}`);
+        if (recargas.length > 0) {
+            writeToLog(`Recargas procesadas: ${recargas.length}`);
+        }
         console.log(`P24 completado - ${ubicacionesAProcesar.length} ubicaciones procesadas`);
 
-        // *** FINALIZACIÓN CON VERIFICACIÓN DE P22 ***
+        // FINALIZACIÓN CON VERIFICACIÓN DE P22
         await finalizarP24ConVerificacion(db, ubicacionesAProcesar);
 
     } catch (err) {
@@ -186,9 +214,27 @@ async function procesaCambiosIncrementales() {
     }
 }
 
-// *** NUEVA FUNCIÓN: VERIFICAR SI YA SE EJECUTÓ ***
-async function verificarSiYaSeEjecuto(db) {
+// FUNCIÓN MEJORADA: VERIFICAR SI YA SE EJECUTÓ CON RECARGAS
+async function verificarSiYaSeEjecutoConRecargas(db) {
     try {
+        // VERIFICAR RECARGAS PRIMERO
+        const cambiosCollection = db.collection('cambios_ubicaciones_temp');
+        const recargasPendientes = await cambiosCollection.find({
+            tipo_cambio: 'RECARGA',
+            procesado: false
+        }).toArray();
+        
+        if (recargasPendientes.length > 0) {
+            writeToLog(`RECARGAS DETECTADAS EN P24:`);
+            writeToLog(`   ${recargasPendientes.length} ubicaciones recargadas requieren procesamiento`);
+            for (const recarga of recargasPendientes) {
+                writeToLog(`   ${recarga.ubicacion}: ${recarga.razon_recarga || 'Datos recargados'}`);
+            }
+            writeToLog(`   FORZANDO EJECUCIÓN P24 - Las recargas tienen máxima prioridad`);
+            return false; // Permitir ejecución
+        }
+        
+        // Lógica original para verificar ejecuciones recientes...
         const estadoCollection = db.collection('estado_procesamiento_p24');
         const estadoReciente = await estadoCollection.findOne({
             _id: 'ultimo_procesamiento_incremental'
@@ -209,10 +255,11 @@ async function verificarSiYaSeEjecuto(db) {
             writeToLog(`   Ubicaciones procesadas: [${(estadoReciente.ubicaciones_procesadas || []).join(', ')}]`);
             
             // Verificar si es el mismo hash de ubicaciones
-            const cambiosActuales = await db.collection('cambios_ubicaciones_temp').find({
+            const cambiosActuales = await cambiosCollection.find({
                 $or: [
                     { tipo_cambio: 'NUEVA' },
-                    { tipo_cambio: 'ACTUALIZADA' }
+                    { tipo_cambio: 'ACTUALIZADA' },
+                    { tipo_cambio: 'RECARGA' }
                 ]
             }).toArray();
             
@@ -221,6 +268,13 @@ async function verificarSiYaSeEjecuto(db) {
                 const hashActual = crypto.createHash('md5').update(ubicacionesActuales.join(',')).digest('hex');
                 
                 if (estadoReciente.hash_ubicaciones === hashActual) {
+                    // VERIFICAR SI HAY RECARGAS EN EL HASH ACTUAL
+                    const hayRecargas = cambiosActuales.some(c => c.tipo_cambio === 'RECARGA');
+                    if (hayRecargas) {
+                        writeToLog(`   RECARGAS EN HASH ACTUAL - PERMITIENDO EJECUCIÓN`);
+                        return false;
+                    }
+                    
                     writeToLog(`   MISMO HASH DETECTADO - P24 ya procesó estos cambios`);
                     return true;
                 }
@@ -235,7 +289,53 @@ async function verificarSiYaSeEjecuto(db) {
     }
 }
 
-// *** FUNCIÓN PARA MARCAR INICIO DE PROCESAMIENTO ***
+// FUNCIÓN PARA PROCESAR RECARGAS ESPECIALES
+async function procesarRecargasEspeciales(db, ubicacionesConRecargas) {
+    if (ubicacionesConRecargas.length === 0) return;
+    
+    writeToLog(`PROCESAMIENTO ESPECIAL DE RECARGAS...`);
+    writeToLog(`   Ubicaciones con recarga: [${ubicacionesConRecargas.join(', ')}]`);
+    
+    // Las recargas requieren limpieza completa de datos previos
+    const targetCollection = db.collection('politica_inventarios_01');
+    
+    writeToLog(`   Limpiando datos previos de ubicaciones recargadas...`);
+    for (const ubicacion of ubicacionesConRecargas) {
+        const resultado = await targetCollection.deleteMany({
+            Ubicacion: ubicacion
+        });
+        writeToLog(`   Ubicación ${ubicacion}: ${resultado.deletedCount} registros previos eliminados`);
+    }
+    
+    // También limpiar de tablas UI
+    const coleccionesUI = [
+        'ui_all_pol_inv',
+        'ui_pol_inv_costo', 
+        'ui_pol_inv_dias_cobertura',
+        'ui_pol_inv_pallets',
+        'ui_pol_inv_uom',
+        'ui_politica_inventarios'
+    ];
+    
+    for (const nombreCol of coleccionesUI) {
+        try {
+            const collections = await db.listCollections({ name: nombreCol }).toArray();
+            if (collections.length > 0) {
+                const col = db.collection(nombreCol);
+                const resultado = await col.deleteMany({
+                    Ubicacion: { $in: ubicacionesConRecargas }
+                });
+                writeToLog(`   Limpiado ${nombreCol}: ${resultado.deletedCount} registros`);
+            }
+        } catch (err) {
+            writeToLog(`   Error limpiando ${nombreCol}: ${err.message}`);
+        }
+    }
+    
+    writeToLog(`Limpieza de recargas completada - listas para recálculo completo`);
+}
+
+// FUNCIÓN PARA MARCAR INICIO DE PROCESAMIENTO
 async function marcarInicioProcesamientoP24(db, ubicacionesAProcesar, ubicacionesAEliminar) {
     try {
         const estadoCollection = db.collection('estado_procesamiento_p24');
@@ -485,41 +585,59 @@ async function restaurarSkusOriginales(db) {
     }
 }
 
-// *** NUEVA FUNCIÓN MEJORADA: MARCAR CAMBIOS COMO PROCESADOS CON COORDINACIÓN ***
-async function marcarCambiosComoProcesadosConCoordinacion(db, ubicacionesProcesadas) {
-    writeToLog(`MARCANDO CAMBIOS COMO PROCESADOS (con coordinación P22)...`);
+// FUNCIÓN MEJORADA: MARCAR CAMBIOS COMO PROCESADOS CON COORDINACIÓN Y RECARGAS
+async function marcarCambiosComoProcesadosConCoordinacionConRecargas(db, ubicacionesProcesadas) {
+    writeToLog(`MARCANDO CAMBIOS COMO PROCESADOS (con coordinación P22 y recargas)...`);
     try {
         const cambiosCollection = db.collection('cambios_ubicaciones_temp');
+        
+        // Identificar recargas procesadas
+        const recargasProcesadas = await cambiosCollection.find({
+            tipo_cambio: 'RECARGA',
+            ubicacion: { $in: ubicacionesProcesadas }
+        }).toArray();
         
         const hashUbicaciones = ubicacionesProcesadas.length > 0 ? 
             crypto.createHash('md5').update(ubicacionesProcesadas.sort().join(',')).digest('hex') : 
             null;
         
+        // Marcar con información específica sobre recargas
+        const updateData = {
+            procesado: true,
+            fecha_procesado: new Date(),
+            procesado_por: 'P24',
+            sesion_procesamiento: `P24_${moment().format('YYYYMMDD_HHmmss')}`,
+            listo_para_p22: true,
+            hash_ubicaciones: hashUbicaciones,
+            ubicaciones_procesadas: ubicacionesProcesadas
+        };
+        
+        // Información adicional para recargas
+        if (recargasProcesadas.length > 0) {
+            updateData.recargas_procesadas = recargasProcesadas.length;
+            updateData.ubicaciones_recargadas = recargasProcesadas.map(r => r.ubicacion);
+            updateData.tipo_procesamiento = 'RECARGA_COMPLETA';
+        }
+        
         const resultado = await cambiosCollection.updateMany(
             { procesado: { $ne: true } }, 
-            {
-                $set: {
-                    procesado: true,
-                    fecha_procesado: new Date(),
-                    procesado_por: 'P24',
-                    sesion_procesamiento: `P24_${moment().format('YYYYMMDD_HHmmss')}`,
-                    listo_para_p22: true,
-                    hash_ubicaciones: hashUbicaciones,
-                    ubicaciones_procesadas: ubicacionesProcesadas
-                }
-            }
+            { $set: updateData }
         );
         
         writeToLog(`Cambios marcados como procesados: ${resultado.modifiedCount}`);
+        if (recargasProcesadas.length > 0) {
+            writeToLog(`   Incluye ${recargasProcesadas.length} recargas: [${recargasProcesadas.map(r => r.ubicacion).join(', ')}]`);
+        }
         writeToLog(`   Hash ubicaciones: ${hashUbicaciones}`);
         
-        // *** CREAR SEÑAL ESPECÍFICA PARA P22 ***
+        // CREAR SEÑAL ESPECÍFICA PARA P22
         const cambiosPendientesP22 = await cambiosCollection.find({
             procesado: true,
             listo_para_p22: true,
             $or: [
                 { tipo_cambio: 'NUEVA' },
-                { tipo_cambio: 'ACTUALIZADA' }
+                { tipo_cambio: 'ACTUALIZADA' },
+                { tipo_cambio: 'RECARGA' }
             ]
         }).toArray();
         
@@ -529,22 +647,34 @@ async function marcarCambiosComoProcesadosConCoordinacion(db, ubicacionesProcesa
             const ubicacionesParaP22 = [...new Set(cambiosPendientesP22.map(c => c.ubicacion))];
             writeToLog(`   Ubicaciones para P22: [${ubicacionesParaP22.join(', ')}]`);
             
+            const signalData = {
+                _id: 'incremental_ready',
+                ready: true,
+                ubicaciones: ubicacionesParaP22,
+                created_by: 'P24',
+                created_at: new Date(),
+                processed_by_p22: false,
+                hash_ubicaciones: hashUbicaciones,
+                sesion_p24: `P24_${moment().format('YYYYMMDD_HHmmss')}`
+            };
+            
+            // Información adicional si hay recargas
+            if (recargasProcesadas.length > 0) {
+                signalData.incluye_recargas = true;
+                signalData.cantidad_recargas = recargasProcesadas.length;
+                signalData.ubicaciones_recargadas = recargasProcesadas.map(r => r.ubicacion);
+            }
+            
             await db.collection('p22_signals').replaceOne(
                 { _id: 'incremental_ready' },
-                {
-                    _id: 'incremental_ready',
-                    ready: true,
-                    ubicaciones: ubicacionesParaP22,
-                    created_by: 'P24',
-                    created_at: new Date(),
-                    processed_by_p22: false,
-                    hash_ubicaciones: hashUbicaciones,
-                    sesion_p24: `P24_${moment().format('YYYYMMDD_HHmmss')}`
-                },
+                signalData,
                 { upsert: true }
             );
             
-            writeToLog(` Señal creada para P22 - ubicaciones listas para integración final`);
+            writeToLog(`Señal creada para P22 - ubicaciones listas para integración final`);
+            if (recargasProcesadas.length > 0) {
+                writeToLog(`   Incluye ${recargasProcesadas.length} recargas procesadas`);
+            }
         }
         
     } catch (err) {
@@ -552,7 +682,7 @@ async function marcarCambiosComoProcesadosConCoordinacion(db, ubicacionesProcesa
     }
 }
 
-// *** NUEVA FUNCIÓN: MARCAR ESTADO INCREMENTAL COMPLETADO CON COORDINACIÓN ***
+// NUEVA FUNCIÓN: MARCAR ESTADO INCREMENTAL COMPLETADO CON COORDINACIÓN
 async function marcarEstadoIncrementalCompletadoConCoordinacion(db, ubicacionesProcesadas) {
     try {
         writeToLog(`Marcando estado incremental completado con coordinación P22...`);
@@ -573,13 +703,13 @@ async function marcarEstadoIncrementalCompletadoConCoordinacion(db, ubicacionesP
             usuario: process.env.USER || 'system',
             ejecutado_por: 'P24',
             
-            // *** CAMPOS DE COORDINACIÓN CON P22 ***
+            // CAMPOS DE COORDINACIÓN CON P22
             listo_para_p22: true,
             p22_debe_ejecutar: ubicacionesProcesadas.length > 0,
             hash_ubicaciones: hashUbicaciones,
             sesion_id: `P24_${Date.now()}`,
             
-            // *** ESTADO DE INTEGRACIÓN ***
+            // ESTADO DE INTEGRACIÓN
             requiere_integracion_final: true,
             datos_temporales_listos: true,
             ui_all_pol_inv_actualizada: true
@@ -596,7 +726,7 @@ async function marcarEstadoIncrementalCompletadoConCoordinacion(db, ubicacionesP
         writeToLog(`   Listo para P22: ${estadoActual.listo_para_p22}`);
         writeToLog(`   Hash ubicaciones: ${hashUbicaciones}`);
         
-        // *** CREAR LOCK TEMPORAL PARA COORDINAR CON P22 ***
+        // CREAR LOCK TEMPORAL PARA COORDINAR CON P22
         await crearLockTemporalP22(db, ubicacionesProcesadas, hashUbicaciones);
         
     } catch (err) {
@@ -604,7 +734,7 @@ async function marcarEstadoIncrementalCompletadoConCoordinacion(db, ubicacionesP
     }
 }
 
-// *** FUNCIÓN PARA CREAR LOCK TEMPORAL P22 ***
+// FUNCIÓN PARA CREAR LOCK TEMPORAL P22
 async function crearLockTemporalP22(db, ubicacionesProcesadas, hashUbicaciones) {
     try {
         const lockCollection = db.collection('p22_execution_lock');
@@ -626,7 +756,7 @@ async function crearLockTemporalP22(db, ubicacionesProcesadas, hashUbicaciones) 
             { upsert: true }
         );
         
-        writeToLog(` Lock temporal creado para P22 - expira en 10 minutos`);
+        writeToLog(`Lock temporal creado para P22 - expira en 10 minutos`);
         writeToLog(`   Ubicaciones protegidas: [${ubicacionesProcesadas.join(', ')}]`);
         
     } catch (err) {
@@ -634,7 +764,7 @@ async function crearLockTemporalP22(db, ubicacionesProcesadas, hashUbicaciones) 
     }
 }
 
-// *** FUNCIÓN PARA VERIFICAR Y PREPARAR P22 ***
+// FUNCIÓN PARA VERIFICAR Y PREPARAR P22
 async function verificarYPrepararP22(db, ubicacionesProcesadas) {
     try {
         writeToLog(`\nVERIFICANDO PREPARACIÓN PARA P22...`);
@@ -646,12 +776,12 @@ async function verificarYPrepararP22(db, ubicacionesProcesadas) {
         }).toArray();
         
         if (datosUI.length === 0) {
-            writeToLog(`  ADVERTENCIA: No hay datos en ui_all_pol_inv para ubicaciones procesadas`);
+            writeToLog(`ADVERTENCIA: No hay datos en ui_all_pol_inv para ubicaciones procesadas`);
             writeToLog(`   P22 no podrá integrar - verificar scripts de políticas`);
             return;
         }
         
-        writeToLog(` ui_all_pol_inv tiene ${datosUI.length} registros para integración`);
+        writeToLog(`ui_all_pol_inv tiene ${datosUI.length} registros para integración`);
         
         // 2. CREAR METADATA PARA P22
         await db.collection('p22_integration_metadata').replaceOne(
@@ -674,7 +804,7 @@ async function verificarYPrepararP22(db, ubicacionesProcesadas) {
             { upsert: true }
         );
         
-        writeToLog(` Metadata de integración creada para P22`);
+        writeToLog(`Metadata de integración creada para P22`);
         writeToLog(`   SKUs por ubicación: ${JSON.stringify(ubicacionesProcesadas.reduce((acc, ub) => {
             acc[ub] = datosUI.filter(d => d.Ubicacion === ub).length;
             return acc;
@@ -685,7 +815,7 @@ async function verificarYPrepararP22(db, ubicacionesProcesadas) {
     }
 }
 
-// *** FUNCIÓN PARA VERIFICAR SI P22 YA PROCESÓ ***
+// FUNCIÓN PARA VERIFICAR SI P22 YA PROCESÓ
 async function verificarP22CompletadoParaUbicaciones(db, ubicaciones) {
     try {
         const estadoP22 = await db.collection('estado_procesamiento_p22').findOne({
@@ -717,10 +847,10 @@ async function verificarP22CompletadoParaUbicaciones(db, ubicaciones) {
     }
 }
 
-// *** FUNCIÓN PARA FINALIZACIÓN CON VERIFICACIÓN ***
+// FUNCIÓN PARA FINALIZACIÓN CON VERIFICACIÓN
 async function finalizarP24ConVerificacion(db, ubicacionesAProcesar) {
     try {
-        writeToLog(`\n VERIFICACIÓN FINAL DE P24...`);
+        writeToLog(`\nVERIFICACIÓN FINAL DE P24...`);
         
         // ACTUALIZAR ESTADO A COMPLETADO
         await db.collection('estado_procesamiento_p24').updateOne(
@@ -735,25 +865,25 @@ async function finalizarP24ConVerificacion(db, ubicacionesAProcesar) {
         );
         
         // ESPERAR UN MOMENTO PARA P22
-        writeToLog(` Esperando 3 segundos para coordinación con P22...`);
+        writeToLog(`Esperando 3 segundos para coordinación con P22...`);
         await new Promise(resolve => setTimeout(resolve, 3000));
         
         // VERIFICAR SI P22 YA PROCESÓ ESTAS UBICACIONES
         const p22Completado = await verificarP22CompletadoParaUbicaciones(db, ubicacionesAProcesar);
         
         if (p22Completado) {
-            writeToLog(` P22 YA PROCESÓ ESTAS UBICACIONES - PROCESO COMPLETAMENTE TERMINADO`);
+            writeToLog(`P22 YA PROCESÓ ESTAS UBICACIONES - PROCESO COMPLETAMENTE TERMINADO`);
             
             // LIMPIAR SEÑALES Y LOCKS
             await db.collection('p22_signals').deleteOne({ _id: 'incremental_ready' });
             await db.collection('p22_execution_lock').deleteOne({ _id: 'p22_incremental_lock' });
             await db.collection('p22_integration_metadata').deleteOne({ _id: 'incremental_ready' });
             
-            writeToLog(` Señales, locks y metadata limpiados`);
-            writeToLog(` PROCESO INCREMENTAL 100% COMPLETADO`);
+            writeToLog(`Señales, locks y metadata limpiados`);
+            writeToLog(`PROCESO INCREMENTAL 100% COMPLETADO`);
             
         } else {
-            writeToLog(` P22 AÚN DEBE PROCESAR ESTAS UBICACIONES`);
+            writeToLog(`P22 AÚN DEBE PROCESAR ESTAS UBICACIONES`);
             writeToLog(`   P24 terminó correctamente - ubicaciones listas para P22`);
             writeToLog(`   Señales y metadata preservados para P22`);
             
@@ -766,7 +896,7 @@ async function finalizarP24ConVerificacion(db, ubicacionesAProcesar) {
                     const p22EjecutadoDespues = await verificarP22CompletadoParaUbicaciones(dbLimpieza, ubicacionesAProcesar);
                     
                     if (!p22EjecutadoDespues) {
-                        writeToLog(`🧹 LIMPIEZA AUTOMÁTICA: P22 no se ejecutó en 20 minutos`);
+                        writeToLog(`LIMPIEZA AUTOMÁTICA: P22 no se ejecutó en 20 minutos`);
                         await dbLimpieza.collection('p22_signals').deleteOne({ _id: 'incremental_ready' });
                         await dbLimpieza.collection('p22_execution_lock').deleteOne({ _id: 'p22_incremental_lock' });
                         await dbLimpieza.collection('p22_integration_metadata').deleteOne({ _id: 'incremental_ready' });
@@ -807,11 +937,11 @@ function writeToLog(message) {
 if (require.main === module) {
     procesaCambiosIncrementales()
         .then(() => {
-            writeToLog(' P24 completado exitosamente');
+            writeToLog('P24 completado exitosamente');
             process.exit(0);
         })
         .catch((err) => {
-            writeToLog(` P24 falló: ${err.message}`);
+            writeToLog(`P24 falló: ${err.message}`);
             console.error(err);
             process.exit(1);
         });

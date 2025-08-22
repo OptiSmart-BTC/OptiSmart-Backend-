@@ -3,21 +3,16 @@ const { MongoClient } = require("mongodb");
 const conex = require("../Configuraciones/ConStrDB");
 const moment = require('moment');
 const crypto = require('crypto');
-
 const { host, puerto } = require("../Configuraciones/ConexionDB");
-
 const dbName = process.argv[2];
 const DBUser = process.argv[3];
 const DBPassword = process.argv[4];
-
 const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
-
 // CONFIGURACIÓN DE LOGS
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
-
 async function crearPoliticaInventariosFinal() {
   const client = new MongoClient(mongoUri);
   let esIncremental = false;
@@ -28,25 +23,28 @@ async function crearPoliticaInventariosFinal() {
     const db = client.db(dbName);
     
     writeToLog('P22 - Creando tabla final politica_inventarios_01 CON HISTORIAL');
-
-    // *** VERIFICAR SI DEBE EJECUTARSE (CON PROTECCIÓN ANTI-DUPLICADOS) ***
-    const debeEjecutarse = await verificarSiDebeEjecutarse(db);
+    // *** VERIFICAR SI DEBE EJECUTARSE (CON PROTECCIÓN ANTI-DUPLICADOS Y RECARGAS) ***
+    const debeEjecutarse = await verificarSiDebeEjecutarseConRecargas(db);
     if (!debeEjecutarse) {
       writeToLog('P22 SALTADO - Ejecución reciente detectada o cambios ya procesados');
       console.log('P22: Saltado por ejecución reciente');
       return;
     }
-
     // DETECTAR MODO DE PROCESAMIENTO
     esIncremental = await detectarModoIncremental(db);
     
     if (esIncremental) {
-      ubicacionesNuevas = await getUbicacionesIncrementales(db);
+      ubicacionesNuevas = await getUbicacionesIncrementalesConRecargas(db);
       writeToLog(`MODO INCREMENTAL - Integrando ${ubicacionesNuevas.length} ubicaciones: [${ubicacionesNuevas.join(', ')}]`);
-      await integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas);
+      await integrarPoliticaIncrementalConHistorialConRecargas(db, ubicacionesNuevas);
       
       // MARCAR ESTADO INCREMENTAL COMPLETADO
       await marcarEstadoProcesamientoCompletado(db, 'INCREMENTAL', ubicacionesNuevas);
+      
+      // GENERAR REPORTE DE RECARGAS
+      if (ubicacionesNuevas.length > 0) {
+        await generarReporteRecargas(db, ubicacionesNuevas);
+      }
       
       // PROCESAR SEÑALES DE P24
       await procesarSenalesP24(db);
@@ -58,9 +56,7 @@ async function crearPoliticaInventariosFinal() {
       // MARCAR ESTADO COMPLETO COMPLETADO
       await marcarEstadoProcesamientoCompletado(db, 'COMPLETO', []);
     }
-
     writeToLog('P22 completado exitosamente');
-
   } catch (err) {
     writeToLog(`Error en P22: ${err.message}`);
     console.error("Error en P22:", err);
@@ -69,17 +65,34 @@ async function crearPoliticaInventariosFinal() {
     await client.close();
   }
 }
-
-// *** FUNCIÓN MEJORADA: VERIFICAR SI DEBE EJECUTARSE ***
-async function verificarSiDebeEjecutarse(db) {
+// *** FUNCIÓN MEJORADA: VERIFICAR SI DEBE EJECUTARSE (CON RECARGAS) ***
+async function verificarSiDebeEjecutarseConRecargas(db) {
   try {
     // VERIFICAR PARÁMETROS ESPECIALES
     const FORCE_EXECUTION = process.argv.includes('--force');
     const SKIP_IF_RECENT = process.argv.includes('--skip-if-recent');
     
     if (FORCE_EXECUTION) {
-      writeToLog('PARÁMETRO --force detectado - Forzando ejecución');
+      writeToLog('PARÁMETRO --force detectado - Forzando ejecución P22');
       return true;
+    }
+    
+    // *** NUEVA VERIFICACIÓN: RECARGAS PROCESADAS RECIENTEMENTE ***
+    const cambiosCollection = db.collection('cambios_ubicaciones_temp');
+    const recargasRecientes = await cambiosCollection.find({
+      tipo_cambio: 'RECARGA',
+      procesado: true,
+      fecha_procesado: { $gte: new Date(Date.now() - 2 * 60 * 1000) } // Últimos 2 minutos
+    }).toArray();
+    
+    if (recargasRecientes.length > 0) {
+      writeToLog(`RECARGAS PROCESADAS RECIENTEMENTE DETECTADAS:`);
+      writeToLog(`   ${recargasRecientes.length} recargas procesadas en los últimos 2 minutos`);
+      recargasRecientes.forEach(recarga => {
+        writeToLog(`   ${recarga.ubicacion}: ${recarga.razon_recarga || 'Recarga procesada'}`);
+      });
+      writeToLog(`   FORZANDO EJECUCIÓN P22 para integrar recargas`);
+      return true; // Forzar ejecución para recargas
     }
     
     // *** VERIFICAR MÚLTIPLES FUENTES DE ESTADO ***
@@ -161,7 +174,6 @@ async function verificarSiDebeEjecutarse(db) {
     }
     
     // *** VERIFICAR CAMBIOS YA PROCESADOS RECIENTEMENTE ***
-    const cambiosCollection = db.collection('cambios_ubicaciones_temp');
     const cambiosRecientes = await cambiosCollection.find({
       procesado: true,
       fecha_procesado: { $gte: new Date(Date.now() - 2 * 60 * 1000) } // Últimos 2 minutos
@@ -187,7 +199,8 @@ async function verificarSiDebeEjecutarse(db) {
       const cambiosPendientes = await cambiosCollection.find({
         $or: [
           { tipo_cambio: 'NUEVA' },
-          { tipo_cambio: 'ACTUALIZADA' }
+          { tipo_cambio: 'ACTUALIZADA' },
+          { tipo_cambio: 'RECARGA' }
         ]
       }).toArray();
       
@@ -215,7 +228,6 @@ async function verificarSiDebeEjecutarse(db) {
     return true; // En caso de error, permitir ejecución
   }
 }
-
 // *** FUNCIÓN PARA PROCESAR SEÑALES DE P24 ***
 async function procesarSenalesP24(db) {
   try {
@@ -249,7 +261,6 @@ async function procesarSenalesP24(db) {
     writeToLog(`Error procesando señales P24: ${err.message}`);
   }
 }
-
 // *** FUNCIÓN MEJORADA PARA MARCAR ESTADO COMPLETADO ***
 async function marcarEstadoProcesamientoCompletado(db, tipoProcessing, ubicacionesProcesadas) {
   try {
@@ -295,7 +306,6 @@ async function marcarEstadoProcesamientoCompletado(db, tipoProcessing, ubicacion
     writeToLog(`Error guardando estado de procesamiento: ${err.message}`);
   }
 }
-
 // *** FUNCIÓN PARA LIMPIAR ESTADOS DUPLICADOS ***
 async function limpiarEstadosDuplicados(db) {
   try {
@@ -320,7 +330,6 @@ async function limpiarEstadosDuplicados(db) {
     writeToLog(`Error limpiando estados duplicados: ${err.message}`);
   }
 }
-
 // *** FUNCIÓN PARA LIMPIAR CAMBIOS PROCESADOS ***
 async function limpiarCambiosProcesados(db) {
   try {
@@ -338,7 +347,6 @@ async function limpiarCambiosProcesados(db) {
     writeToLog(`Error limpiando cambios procesados: ${err.message}`);
   }
 }
-
 async function detectarModoIncremental(db) {
   try {
     const collections = await db.listCollections({ name: 'cambios_ubicaciones_temp' }).toArray();
@@ -347,7 +355,7 @@ async function detectarModoIncremental(db) {
     if (existeCambios) {
       const cambios = await db.collection('cambios_ubicaciones_temp').find().toArray();
       const hayUbicacionesNuevas = cambios.some(c => 
-        c.tipo_cambio === 'NUEVA' || c.tipo_cambio === 'ACTUALIZADA'
+        c.tipo_cambio === 'NUEVA' || c.tipo_cambio === 'ACTUALIZADA' || c.tipo_cambio === 'RECARGA'
       );
       
       writeToLog(`Cambios encontrados en cambios_ubicaciones_temp: ${cambios.length}`);
@@ -363,18 +371,24 @@ async function detectarModoIncremental(db) {
     return false;
   }
 }
-
-async function getUbicacionesIncrementales(db) {
+// *** FUNCIÓN MODIFICADA PARA INCLUIR RECARGAS ***
+async function getUbicacionesIncrementalesConRecargas(db) {
   try {
     const cambios = await db.collection('cambios_ubicaciones_temp').find({
       $or: [
         { tipo_cambio: 'NUEVA' },
-        { tipo_cambio: 'ACTUALIZADA' }
+        { tipo_cambio: 'ACTUALIZADA' },
+        { tipo_cambio: 'RECARGA' } // *** INCLUIR RECARGAS ***
       ]
     }).toArray();
     
     const ubicaciones = cambios.map(c => c.ubicacion);
+    const recargas = cambios.filter(c => c.tipo_cambio === 'RECARGA');
+    
     writeToLog(`Ubicaciones incrementales obtenidas: [${ubicaciones.join(', ')}]`);
+    if (recargas.length > 0) {
+      writeToLog(`   Incluye ${recargas.length} recargas: [${recargas.map(r => r.ubicacion).join(', ')}]`);
+    }
     
     return ubicaciones;
   } catch (err) {
@@ -382,14 +396,29 @@ async function getUbicacionesIncrementales(db) {
     return [];
   }
 }
-
-// *** FUNCIÓN CORRECTA - P22 SOLO ORGANIZA, NO AÑADE DATOS ***
-async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
-  writeToLog('P22 - MODO INCREMENTAL: Organizando datos YA procesados por P24...');
+// *** FUNCIÓN MODIFICADA PARA MANEJAR RECARGAS ***
+async function integrarPoliticaIncrementalConHistorialConRecargas(db, ubicacionesNuevas) {
+  writeToLog('P22 - MODO INCREMENTAL: Organizando datos YA procesados por P24 (incluyendo recargas)...');
   
   if (ubicacionesNuevas.length === 0) {
     writeToLog('No hay ubicaciones nuevas que procesar');
     return;
+  }
+
+  // *** VERIFICAR SI HAY RECARGAS EN EL CONJUNTO ***
+  const cambiosCollection = db.collection('cambios_ubicaciones_temp');
+  const recargasEnConjunto = await cambiosCollection.find({
+    tipo_cambio: 'RECARGA',
+    ubicacion: { $in: ubicacionesNuevas }
+  }).toArray();
+  
+  if (recargasEnConjunto.length > 0) {
+    writeToLog(`RECARGAS DETECTADAS EN P22:`);
+    writeToLog(`   ${recargasEnConjunto.length} ubicaciones fueron recargadas`);
+    for (const recarga of recargasEnConjunto) {
+      writeToLog(`   ${recarga.ubicacion}: ${recarga.razon_recarga || 'Datos recargados'}`);
+    }
+    writeToLog(`   Las recargas ya fueron limpiadas por P24 - procediendo con organización normal`);
   }
 
   const targetCollection = db.collection('politica_inventarios_01');
@@ -397,9 +426,9 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
   // *** VERIFICAR QUE YA EXISTEN DATOS PROCESADOS POR P24 ***
   writeToLog(`Verificando datos procesados por P24 para ubicaciones: [${ubicacionesNuevas.join(', ')}]`);
   
+  // Para recargas, solo deberían existir datos nuevos (ya que P24 limpió los anteriores)
   const datosExistentes = await targetCollection.find({
     Ubicacion: { $in: ubicacionesNuevas },
-    // Buscar datos que vienen del P24 (pueden no tener Es_Actual todavía)
     $or: [
       { Es_Actual: { $exists: false } },  // Datos nuevos de P24
       { Es_Actual: true },                // Datos ya marcados
@@ -410,7 +439,7 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
   writeToLog(`Datos encontrados en politica_inventarios_01: ${datosExistentes.length} registros`);
 
   if (datosExistentes.length === 0) {
-    writeToLog(' No se encontraron datos procesados por P24 - P22 no puede continuar');
+    writeToLog('No se encontraron datos procesados por P24 - P22 no puede continuar');
     writeToLog('   P24 debe ejecutarse primero para generar los datos');
     return;
   }
@@ -418,33 +447,99 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
   const fechaEjecucion = new Date();
   const versionEjecucion = moment().format('YYYYMMDD_HHmmss');
   
-  // *** PASO 1: IDENTIFICAR DATOS NUEVOS VS HISTÓRICOS ***
-  writeToLog(`Analizando datos existentes...`);
+  // *** PARA RECARGAS, LA LÓGICA ES MÁS SIMPLE ***
+  const ubicacionesConRecarga = recargasEnConjunto.map(r => r.ubicacion);
   
-  // Agrupar por SKU+Ubicación para identificar duplicados
-  const gruposPorSKUUbicacion = {};
-  datosExistentes.forEach(doc => {
-    const key = `${doc.SKU}|${doc.Ubicacion}`;
-    if (!gruposPorSKUUbicacion[key]) {
-      gruposPorSKUUbicacion[key] = [];
-    }
-    gruposPorSKUUbicacion[key].push(doc);
-  });
-  
-  let registrosActualizados = 0;
-  let registrosMarcadosHistoricos = 0;
-  let registrosYaCorrectos = 0;
-  
-  // *** PASO 2: PROCESAR CADA GRUPO SKU+UBICACIÓN ***
-  for (const [key, registros] of Object.entries(gruposPorSKUUbicacion)) {
-    const [sku, ubicacion] = key.split('|');
+  if (ubicacionesConRecarga.length > 0) {
+    writeToLog(`PROCESAMIENTO ESPECIAL PARA RECARGAS:`);
     
-    if (registros.length === 1) {
-      // Solo un registro - solo asegurar que esté marcado como actual
-      const registro = registros[0];
-      if (!registro.Es_Actual) {
+    // Para ubicaciones recargadas, todos los datos deberían ser nuevos
+    for (const ubicacionRecargada of ubicacionesConRecarga) {
+      const datosUbicacion = datosExistentes.filter(d => d.Ubicacion === ubicacionRecargada);
+      
+      writeToLog(`   Ubicación recargada ${ubicacionRecargada}: ${datosUbicacion.length} registros nuevos`);
+      
+      // Marcar todos como actuales (ya que P24 limpió los anteriores)
+      for (const doc of datosUbicacion) {
         await targetCollection.updateOne(
-          { _id: registro._id },
+          { _id: doc._id },
+          {
+            $set: {
+              Es_Actual: true,
+              Fecha_Calculo: fechaEjecucion,
+              Version_Calculo: versionEjecucion,
+              Modo_Procesamiento: 'RECARGA_INCREMENTAL',
+              Fue_Recargada: true,
+              Fecha_Recarga: fechaEjecucion
+            }
+          }
+        );
+      }
+    }
+  }
+  
+  // *** PROCESAR UBICACIONES NO-RECARGADAS CON LÓGICA NORMAL ***
+  const ubicacionesNormales = ubicacionesNuevas.filter(u => !ubicacionesConRecarga.includes(u));
+  
+  if (ubicacionesNormales.length > 0) {
+    writeToLog(`PROCESAMIENTO NORMAL PARA UBICACIONES: [${ubicacionesNormales.join(', ')}]`);
+    
+    const datosNormales = datosExistentes.filter(d => ubicacionesNormales.includes(d.Ubicacion));
+    
+    // Agrupar por SKU+Ubicación para identificar duplicados
+    const gruposPorSKUUbicacion = {};
+    datosNormales.forEach(doc => {
+      const key = `${doc.SKU}|${doc.Ubicacion}`;
+      if (!gruposPorSKUUbicacion[key]) {
+        gruposPorSKUUbicacion[key] = [];
+      }
+      gruposPorSKUUbicacion[key].push(doc);
+    });
+    
+    let registrosActualizados = 0;
+    let registrosMarcadosHistoricos = 0;
+    let registrosYaCorrectos = 0;
+    
+    // Procesar cada grupo normalmente
+    for (const [key, registros] of Object.entries(gruposPorSKUUbicacion)) {
+      const [sku, ubicacion] = key.split('|');
+      
+      if (registros.length === 1) {
+        const registro = registros[0];
+        if (!registro.Es_Actual) {
+          await targetCollection.updateOne(
+            { _id: registro._id },
+            {
+              $set: {
+                Es_Actual: true,
+                Fecha_Calculo: fechaEjecucion,
+                Version_Calculo: versionEjecucion,
+                Modo_Procesamiento: 'INCREMENTAL'
+              }
+            }
+          );
+          registrosActualizados++;
+          writeToLog(`    Marcado como actual: SKU ${sku}, Ubicación ${ubicacion}`);
+        } else {
+          registrosYaCorrectos++;
+        }
+      } else {
+        // Múltiples registros - mantener el más reciente, marcar otros como históricos
+        writeToLog(`    Resolviendo ${registros.length} duplicados para SKU ${sku}, Ubicación ${ubicacion}`);
+        
+        // Ordenar por fecha de inserción/timestamp (más reciente primero)
+        const registrosOrdenados = registros.sort((a, b) => {
+          const fechaA = a.Timestamp_Insert || a.Fecha_Calculo || new Date(0);
+          const fechaB = b.Timestamp_Insert || b.Fecha_Calculo || new Date(0);
+          return new Date(fechaB) - new Date(fechaA);
+        });
+        
+        const registroMasReciente = registrosOrdenados[0];
+        const registrosAMarcarHistoricos = registrosOrdenados.slice(1);
+        
+        // Marcar el más reciente como actual
+        await targetCollection.updateOne(
+          { _id: registroMasReciente._id },
           {
             $set: {
               Es_Actual: true,
@@ -455,62 +550,37 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
           }
         );
         registrosActualizados++;
-        writeToLog(`    Marcado como actual: SKU ${sku}, Ubicación ${ubicacion}`);
-      } else {
-        registrosYaCorrectos++;
-      }
-    } else {
-      // Múltiples registros - mantener el más reciente, marcar otros como históricos
-      writeToLog(`    Resolviendo ${registros.length} duplicados para SKU ${sku}, Ubicación ${ubicacion}`);
-      
-      // Ordenar por fecha de inserción/timestamp (más reciente primero)
-      const registrosOrdenados = registros.sort((a, b) => {
-        const fechaA = a.Timestamp_Insert || a.Fecha_Calculo || new Date(0);
-        const fechaB = b.Timestamp_Insert || b.Fecha_Calculo || new Date(0);
-        return new Date(fechaB) - new Date(fechaA);
-      });
-      
-      const registroMasReciente = registrosOrdenados[0];
-      const registrosAMarcarHistoricos = registrosOrdenados.slice(1);
-      
-      // Marcar el más reciente como actual
-      await targetCollection.updateOne(
-        { _id: registroMasReciente._id },
-        {
-          $set: {
-            Es_Actual: true,
-            Fecha_Calculo: fechaEjecucion,
-            Version_Calculo: versionEjecucion,
-            Modo_Procesamiento: 'INCREMENTAL'
-          }
-        }
-      );
-      registrosActualizados++;
-      
-      // Marcar los demás como históricos
-      for (const regHistorico of registrosAMarcarHistoricos) {
-        await targetCollection.updateOne(
-          { _id: regHistorico._id },
-          {
-            $set: {
-              Es_Actual: false,
-              Fecha_Historico: fechaEjecucion,
-              Version_Historico: versionEjecucion,
-              Motivo_Historico: 'Duplicado resuelto por P22'
+        
+        // Marcar los demás como históricos
+        for (const regHistorico of registrosAMarcarHistoricos) {
+          await targetCollection.updateOne(
+            { _id: regHistorico._id },
+            {
+              $set: {
+                Es_Actual: false,
+                Fecha_Historico: fechaEjecucion,
+                Version_Historico: versionEjecucion,
+                Motivo_Historico: 'Duplicado resuelto por P22'
+              }
             }
-          }
-        );
-        registrosMarcadosHistoricos++;
+          );
+          registrosMarcadosHistoricos++;
+        }
+        
+        writeToLog(`     → Actual: ${registroMasReciente._id}`);
+        writeToLog(`     → Históricos: ${registrosAMarcarHistoricos.length}`);
       }
-      
-      writeToLog(`     → Actual: ${registroMasReciente._id}`);
-      writeToLog(`     → Históricos: ${registrosAMarcarHistoricos.length}`);
     }
   }
   
-  // *** PASO 3: VERIFICAR RESULTADO FINAL ***
+  // *** VERIFICACIÓN FINAL CON INFORMACIÓN DE RECARGAS ***
   const totalActuales = await targetCollection.countDocuments({ 
     Es_Actual: true,
+    Ubicacion: { $in: ubicacionesNuevas }
+  });
+  
+  const totalRecargadas = await targetCollection.countDocuments({ 
+    Fue_Recargada: true,
     Ubicacion: { $in: ubicacionesNuevas }
   });
   
@@ -519,13 +589,12 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
     Ubicacion: { $in: ubicacionesNuevas }
   });
   
-  writeToLog(` P22 INCREMENTAL COMPLETADO:`);
+  writeToLog(`P22 INCREMENTAL COMPLETADO (con recargas):`);
   writeToLog(`    Registros actuales para ubicaciones procesadas: ${totalActuales}`);
   writeToLog(`    Registros históricos: ${totalHistoricos}`);
-  writeToLog(`    Registros actualizados: ${registrosActualizados}`);
-  writeToLog(`    Registros marcados históricos: ${registrosMarcadosHistoricos}`);
-  writeToLog(`    Registros ya correctos: ${registrosYaCorrectos}`);
-  writeToLog(`    Ubicaciones procesadas: [${ubicacionesNuevas.join(', ')}]`);
+  writeToLog(`    Registros de ubicaciones recargadas: ${totalRecargadas}`);
+  writeToLog(`    Ubicaciones con recarga: [${ubicacionesConRecarga.join(', ')}]`);
+  writeToLog(`    Ubicaciones normales: [${ubicacionesNormales.join(', ')}]`);
   
   // Mostrar resumen por ubicación
   for (const ubicacion of ubicacionesNuevas) {
@@ -535,8 +604,25 @@ async function integrarPoliticaIncrementalConHistorial(db, ubicacionesNuevas) {
     });
     writeToLog(`    Ubicación ${ubicacion}: ${countUbicacion} registros actuales`);
   }
+  
+  // Marcar recargas como completamente procesadas
+  if (recargasEnConjunto.length > 0) {
+    await cambiosCollection.updateMany(
+      { 
+        tipo_cambio: 'RECARGA',
+        ubicacion: { $in: ubicacionesConRecarga }
+      },
+      {
+        $set: {
+          completamente_procesado: true,
+          fecha_completado: new Date(),
+          procesado_completamente_por: 'P22'
+        }
+      }
+    );
+    writeToLog(`Recargas marcadas como completamente procesadas`);
+  }
 }
-
 // *** FUNCIÓN PARA MODO COMPLETO - CORREGIDA PARA SOLO ORGANIZAR ***
 async function crearPoliticaCompleta(db) {
   writeToLog('P22 - MODO COMPLETO: Organizando TODOS los datos YA procesados por P24...');
@@ -586,7 +672,7 @@ async function crearPoliticaCompleta(db) {
     {
       $group: {
         _id: { SKU: "$SKU", Ubicacion: "$Ubicacion" },
-        registroMasReciente: { $first: "$$ROOT" },
+        registroMasReciente: { $first: "$ROOT" },
         totalRegistros: { $sum: 1 }
       }
     }
@@ -673,7 +759,6 @@ async function crearPoliticaCompleta(db) {
     await limpiarDuplicadosActuales(db);
   }
 }
-
 // *** FUNCIÓN AUXILIAR PARA LIMPIAR DUPLICADOS ACTUALES ***
 async function limpiarDuplicadosActuales(db) {
   writeToLog(` Limpiando duplicados en registros actuales...`);
@@ -722,7 +807,6 @@ async function limpiarDuplicadosActuales(db) {
   
   writeToLog(` Limpieza completada: ${totalLimpiados} duplicados marcados como históricos`);
 }
-
 // *** FUNCIÓN PARA VERIFICACIÓN Y LIMPIEZA FINAL ***
 async function verificarYLimpiarDuplicadosFinales(db, ubicacionesProcesadas) {
   writeToLog(` VERIFICANDO DUPLICADOS FINALES...`);
@@ -776,7 +860,6 @@ async function verificarYLimpiarDuplicadosFinales(db, ubicacionesProcesadas) {
     writeToLog(` No se encontraron duplicados`);
   }
 }
-
 // *** FUNCIÓN PARA LIMPIAR TODA LA COLECCIÓN DE DUPLICADOS ***
 async function limpiarTodosDuplicados(db) {
   writeToLog(` LIMPIEZA COMPLETA DE DUPLICADOS...`);
@@ -820,7 +903,55 @@ async function limpiarTodosDuplicados(db) {
   const totalFinal = await targetCollection.countDocuments({ Es_Actual: true });
   writeToLog(` Total registros finales: ${totalFinal}`);
 }
-
+// *** NUEVA FUNCIÓN PARA GENERAR REPORTE DE RECARGAS ***
+async function generarReporteRecargas(db, ubicacionesProcesadas) {
+  try {
+    const cambiosCollection = db.collection('cambios_ubicaciones_temp');
+    const recargasProcesadas = await cambiosCollection.find({
+      tipo_cambio: 'RECARGA',
+      ubicacion: { $in: ubicacionesProcesadas },
+      completamente_procesado: true
+    }).toArray();
+    
+    if (recargasProcesadas.length > 0) {
+      writeToLog(`REPORTE DE RECARGAS COMPLETADAS:`);
+      writeToLog(`   Total recargas procesadas: ${recargasProcesadas.length}`);
+      
+      for (const recarga of recargasProcesadas) {
+        const tiempoProcesamiento = recarga.fecha_completado - recarga.fecha_cambio;
+        const minutos = Math.round(tiempoProcesamiento / (1000 * 60));
+        
+        writeToLog(`   ${recarga.ubicacion}:`);
+        writeToLog(`      Razón: ${recarga.razon_recarga || 'Recarga automática'}`);
+        writeToLog(`      Tiempo procesamiento: ${minutos} minutos`);
+        if (recarga.detalles_recarga) {
+          writeToLog(`      Detalles: ${recarga.detalles_recarga}`);
+        }
+      }
+      
+      // Crear registro histórico
+      const reporteCollection = db.collection('historial_recargas_completadas');
+      const reporte = {
+        fecha_reporte: new Date(),
+        recargas_completadas: recargasProcesadas.length,
+        ubicaciones_recargadas: recargasProcesadas.map(r => r.ubicacion),
+        tiempo_promedio_procesamiento: Math.round(
+          recargasProcesadas.reduce((sum, r) => {
+            const tiempo = r.fecha_completado - r.fecha_cambio;
+            return sum + (tiempo / (1000 * 60));
+          }, 0) / recargasProcesadas.length
+        ),
+        generado_por: 'P22'
+      };
+      
+      await reporteCollection.insertOne(reporte);
+      writeToLog(`Reporte histórico guardado - ID: ${reporte._id}`);
+    }
+    
+  } catch (err) {
+    writeToLog(`Error generando reporte de recargas: ${err.message}`);
+  }
+}
 async function getNextEjecucionNumber(db) {
   try {
     const contadorCollection = db.collection('contadores_ejecucion');
@@ -835,7 +966,6 @@ async function getNextEjecucionNumber(db) {
     return Date.now();
   }
 }
-
 function writeToLog(message) {
   const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
   const logMessage = `[${timestamp}] P22: ${message}`;
@@ -855,6 +985,5 @@ function writeToLog(message) {
     console.log(logMessage);
   }
 }
-
 // Ejecutar función principal
 crearPoliticaInventariosFinal();
