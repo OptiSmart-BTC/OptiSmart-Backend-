@@ -2,19 +2,19 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const moment = require('moment');
 const { decryptData } = require('./DeCriptaPassAppDb');
-const { path_sftp, path_opti, path_users } = require(`../Configuraciones/paths_vars`);
+//const { path_sftp, path_opti, path_users } = require(`../Configuraciones/paths_vars`);
  
 const parametroUsuario = process.argv.slice(2)[0];
 
 const { GB_DBName } = require(`../Configuraciones/dbUsers/${parametroUsuario}.dbnamevar.js`);
 const parametroFolder = GB_DBName.toUpperCase();
 
-const { DBUser, DBPassword, DBName } = require(`${path_users}/${parametroFolder}/cfg/dbvars`);
+const { DBUser, DBPassword, DBName } = require(`../../${parametroFolder}/cfg/dbvars`);
 const dbName = `btc_opti_${DBName}`;
 
 const logFileName = 'PowerBI_PlanReposicion';
-const logFile = `${path_users}/${parametroFolder}/log/${logFileName}.log`;
-const logFolder = `${path_users}/${parametroFolder}/log/Log_historico`;
+const logFile = `../../${parametroFolder}/log/${logFileName}.log`;
+const logFolder = `../../${parametroFolder}/log/Log_historico`;
 
 
 

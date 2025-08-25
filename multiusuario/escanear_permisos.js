@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // esta direccion debe apuntar a donde esten las paginas
-const BASE_DIR = 'C:\\BTCOpti-WebApp\\opti-webapp\\src';
+const BASE_DIR = '/Users/santiago/mongo-db/data/OptiSmart/OptiSmart-Frontend-/opti-webapp/src';
 
 // escanea los permisos
 const scanFiles = (dir) => {
