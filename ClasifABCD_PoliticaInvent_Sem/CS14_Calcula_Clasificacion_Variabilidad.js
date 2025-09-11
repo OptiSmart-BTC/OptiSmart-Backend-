@@ -28,6 +28,8 @@ async function updateClasificacionVariabilidad() {
   const db = client.db(dbName);
 
   // Obtener los parámetros de comparación
+  
+  //BAJA
   const criteriosOrden1 = await db.collection('parametros_usuario').findOne({
     Tipo: 'Criterios',
     Criterio_Clasificacion: 'Variabilidad',
@@ -35,7 +37,7 @@ async function updateClasificacionVariabilidad() {
   });
 
 
-
+// MEDIA
   const criteriosOrden2 = await db.collection('parametros_usuario').findOne({
     Tipo: 'Criterios',
     Criterio_Clasificacion: 'Variabilidad',
@@ -43,7 +45,7 @@ async function updateClasificacionVariabilidad() {
   });
 
 
-
+//.  ALTOO
   const criteriosOrden3 = await db.collection('parametros_usuario').findOne({
     Tipo: 'Criterios',
     Criterio_Clasificacion: 'Variabilidad',

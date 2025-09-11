@@ -59,11 +59,7 @@ async function main() {
           Week_Year: {         
             $concat: [
             { $toString: '$calendarData.Week' },
-<<<<<<< HEAD
-            '_',
-=======
             '_W',
->>>>>>> origin/test
             { $toString: '$calendarData.Year' },
           ],},
         },

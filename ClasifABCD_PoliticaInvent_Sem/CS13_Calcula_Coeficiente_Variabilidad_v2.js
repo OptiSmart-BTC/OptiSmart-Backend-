@@ -77,7 +77,8 @@ await collection.updateMany(
             then: 0,
             else: {
               $divide: [
-                '$DS_Demanda',
+                //'$DS_Demanda',
+                '$STDEV_Costo',
                 '$Demanda_Promedio_Semanal_Costo'
               ]
             }
