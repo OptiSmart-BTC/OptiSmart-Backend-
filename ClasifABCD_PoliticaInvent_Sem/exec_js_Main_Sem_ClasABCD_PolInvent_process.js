@@ -1,10 +1,7 @@
-// exec_js_Main_ClasABCD_PolInvent_process_SEM.js
 const { exec } = require("child_process");
 const fs = require("fs");
 const moment = require("moment");
 const { decryptData } = require("./DeCriptaPassAppDb");
-const { MongoClient } = require("mongodb");
-const { host, puerto, passadmin } = require("../Configuraciones/ConexionDB");
 
 const parametroUsuario = process.argv.slice(2)[0];
 
@@ -13,6 +10,7 @@ const {
 } = require(`../Configuraciones/dbUsers/${parametroUsuario}.dbnamevar.js`);
 const parametroFolder = GB_DBName.toUpperCase();
 
+//const { AppUser, AppPassword, Tipo} = require(`../../${parametroFolder}/cfg/${parametroUsuario}.uservars`);
 const {
   DBUser,
   DBPassword,
@@ -20,16 +18,33 @@ const {
 } = require(`../../${parametroFolder}/cfg/dbvars`);
 const dbName = `btc_opti_${DBName}`;
 
-const logFileName = "ClasABCD_PolInvent_SEM";
+//const parametroFolder = parametroUsuario.toUpperCase();
+//const dbName = `btc_opti_${parametroUsuario}`;
+
+const logFileName = "ClasABCD_PolInvent_Sem";
 const logFile = `../../${parametroFolder}/log/${logFileName}.log`;
 const logFolder = `../../${parametroFolder}/log/Log_historico`;
 
+//const { DBUser, DBPassword } = require(`../../${parametroFolder}/cfg/uservars`);
+
+//------------------------------------------------
+
+// Verificar si el archivo de log ya existe
 if (fs.existsSync(logFile)) {
   const timestamp = moment().format("YYYYMMDD_HHmmss");
   const renamedLogFile = `../../${parametroFolder}/log/Log_historico/${logFileName}_${timestamp}.log`;
-  if (!fs.existsSync(logFolder)) fs.mkdirSync(logFolder);
+
+  // Crear el folder Log_historico si no existe
+  if (!fs.existsSync(logFolder)) {
+    fs.mkdirSync(logFolder);
+  }
+
+  // Mover el archivo existente a Log_historico
   fs.renameSync(logFile, `${renamedLogFile}`);
 }
+
+const { MongoClient } = require("mongodb");
+const { host, puerto, passadmin } = require("../Configuraciones/ConexionDB");
 
 let skuIgnorados = [];
 
@@ -37,11 +52,9 @@ async function filtraSKU(passadminDeCripta) {
   const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
     passadminDeCripta
   )}@${host}:${puerto}/?authSource=admin`;
-
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
-
   const skuCollection = db.collection("sku");
 
   const todosSKU = await skuCollection.find().toArray();
@@ -59,19 +72,62 @@ async function filtraSKU(passadminDeCripta) {
 
   try {
     await skuCollection.deleteMany({});
-    console.log("Se eliminaron todos los SKU de la colección original.");
     if (skuPermitidos.length > 0) {
       await skuCollection.insertMany(skuPermitidos);
-      console.log("Se insertaron los SKU permitidos.");
-    } else {
-      console.log("No hay SKU permitidos que insertar.");
     }
   } catch (err) {
     console.error("Error al borrar/insertar SKU:", err);
   }
 
-  const totalFinal = await skuCollection.countDocuments();
-  console.log("SKUs en colección 'sku' al final del filtro:", totalFinal);
+  await client.close();
+}
+
+async function reintegraIgnorados(nombreTablaFinal) {
+  const passadminDeCripta = await getDecryptedPassadmin();
+  await filtraSKU(passadminDeCripta);
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+  const client = new MongoClient(uri);
+  await client.connect();
+  const db = client.db(dbName);
+
+  const tablaFinal = db.collection(nombreTablaFinal);
+  const actuales = await tablaFinal.find().toArray();
+  const camposBase = actuales.length > 0 ? Object.keys(actuales[0]) : [];
+  const ejemploReferencia = actuales[0] || {};
+
+  const nuevosRegistros = skuIgnorados.map((sku) => {
+    const nuevo = {};
+    for (const campo of camposBase) {
+      if (sku.hasOwnProperty(campo)) {
+        nuevo[campo] = sku[campo];
+      } else {
+        const valorEjemplo = ejemploReferencia[campo];
+        nuevo[campo] = typeof valorEjemplo === "number" ? 0 : "NA";
+      }
+    }
+    return nuevo;
+  });
+
+  if (nuevosRegistros.length > 0) {
+    await tablaFinal.insertMany(nuevosRegistros);
+    console.log(
+      `Reintegrados ${nuevosRegistros.length} SKU a ${nombreTablaFinal}`
+    );
+  }
+
+  const skuCollection = db.collection("sku");
+  if (skuIgnorados.length > 0) {
+    const ignoradosReformateados = skuIgnorados.map(({ _id, ...resto }) => ({
+      ...resto,
+      Ignorar: 1,
+    }));
+    await skuCollection.insertMany(ignoradosReformateados);
+    console.log(
+      `Reintegrados ${ignoradosReformateados.length} SKU a colección 'sku'`
+    );
+  }
 
   await client.close();
 }
@@ -85,20 +141,39 @@ async function IniciaejecutarArchivos() {
       nombre: "CS00_limpiaTablasProcesos.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    /*
     {
       nombre: "CS01_Actualiza_HistDMD_Week_Year.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    */
+      {
+      nombre: "CS01.V2_Actualiza_HistDMD_Week_Year.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    
     {
       nombre: "CS02_Calcula_FechasHorizontes.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    /*
     {
       nombre: "CS03_AgrupaHistDMD_v2.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    */
+    {
+      nombre: "CS03.V3_AgrupaHistDMD.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    /*
     {
       nombre: "CS04_Calcula_Demanda_Costo_v2.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    */
+       {
+      nombre: "CS04.V3_Calcula_Demanda_Costo.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
@@ -129,16 +204,11 @@ async function IniciaejecutarArchivos() {
       nombre: "CS09.1_Actualiza_Datos_SKU.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    //{ nombre: 'CS10_CalculaErrorCuadrado_HistDMD.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    //{ nombre: 'CS11_Calcula_Variabilidad_Demanda_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    //{ nombre: 'CS12_Calcula_DS_Demanda.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     {
-      nombre: "CS10_CalculaErrorCuadrado_HistDMD.js",
-      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
-    },
-    {
-      nombre: "CS11_Calcula_Variabilidad_Demanda_v2.js",
-      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
-    },
-    {
-      nombre: "CS12_Calcula_DS_Demanda.js",
+      nombre: "CS12.1_Calcula_STDEV.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
@@ -193,12 +263,16 @@ async function IniciaejecutarArchivos() {
       nombre: "PS03_Calcula_Demanda_Promedio_Semanal.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    //{ nombre: 'PS04_CalculaErrorCuadrado_HistDMD.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    //{ nombre: 'PS05_Calcula_Variabilidad_Demanda_Cantidad_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    /* 
     {
-      nombre: "PS04_CalculaErrorCuadrado_HistDMD.js",
+      nombre: "PS04.1_CalculaErrorCuadrado_Variabilidad_Demanda_Cantidad.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    */
     {
-      nombre: "PS05_Calcula_Variabilidad_Demanda_Cantidad_v2.js",
+      nombre: "PS05.1_Calcula_DS.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
@@ -217,6 +291,7 @@ async function IniciaejecutarArchivos() {
       nombre: "PS09_Calcula_DS_LT.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    //{ nombre: 'PS09.2_Calcula_DS_LT_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     {
       nombre: "PS09.1_Calcula_Stat_SS.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -283,15 +358,16 @@ async function IniciaejecutarArchivos() {
     },
   ];
 
-  writeToLog(`Proceso SEM de Clasificación ABCD\n`);
+  writeToLog(`Proceso de Clasificacion ABCD por Semana\n`);
   writeToLog(
     `Inicio de ejecucion: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n`
   );
 
   for (const archivo of archivos) {
-    console.log(`${archivo.nombre}`);
+    const inicio = moment();
     const comando = `node ${archivo.nombre} ${archivo.parametros}`;
     console.log(`${archivo.nombre}`);
+
     writeToLog(`\n------------------------------`);
     writeToLog(
       `Inicio de ${archivo.nombre}: ${inicio.format("YYYY-MM-DD HH:mm:ss")}`
@@ -316,74 +392,24 @@ async function IniciaejecutarArchivos() {
 
   const now_fin = moment().format("YYYY-MM-DD HH:mm:ss");
   writeToLog(`\n\n`);
-  writeToLog(`Terminan el Proceso SEM de Clasificación ABCD: ${now_fin}\n`);
+  writeToLog(
+    `Terminan el Proceso de Clasificacion ABCD por Semana: ${now_fin}\n`
+  );
 
   const nombreFinal = parametroUsuario.toLowerCase().includes("montecarlo")
     ? "ui_sem_all_pol_inv_montecarlo"
     : "ui_sem_all_pol_inv";
-
   await reintegraIgnorados(nombreFinal);
-}
-
-async function reintegraIgnorados(nombreTablaFinal) {
-  const passadminDeCripta = await getDecryptedPassadmin();
-  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
-    passadminDeCripta
-  )}@${host}:${puerto}/?authSource=admin`;
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db(dbName);
-
-  const tablaFinal = db.collection(nombreTablaFinal);
-  const actuales = await tablaFinal.find().toArray();
-
-  const camposBase = actuales.length > 0 ? Object.keys(actuales[0]) : [];
-  const ejemploReferencia = actuales[0] || {};
-
-  const nuevosRegistros = skuIgnorados.map((sku) => {
-    const nuevo = {};
-    for (const campo of camposBase) {
-      if (sku.hasOwnProperty(campo)) {
-        nuevo[campo] = sku[campo];
-      } else {
-        const valorEjemplo = ejemploReferencia[campo];
-        nuevo[campo] = typeof valorEjemplo === "number" ? 0 : null;
-      }
-    }
-    return nuevo;
-  });
-
-  if (nuevosRegistros.length > 0) {
-    await tablaFinal.insertMany(nuevosRegistros);
-    console.log(
-      `Reintegrados ${nuevosRegistros.length} SKU a ${nombreTablaFinal}`
-    );
-  }
-
-  const skuCollection = db.collection("sku");
-  if (skuIgnorados.length > 0) {
-    const ignoradosReformateados = skuIgnorados.map((sku) => {
-      const { _id, ...resto } = sku;
-      return {
-        ...resto,
-        Ignorar: 1,
-      };
-    });
-
-    await skuCollection.insertMany(ignoradosReformateados);
-    console.log(
-      `Reintegrados ${ignoradosReformateados.length} SKU a colección 'sku' sin conflictos de _id`
-    );
-  }
-
-  await client.close();
 }
 
 function ejecutarComando(comando) {
   return new Promise((resolve, reject) => {
     exec(comando, (error, stdout, stderr) => {
-      if (error) reject(error);
-      else resolve();
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
     });
   });
 }
@@ -392,6 +418,7 @@ function writeToLog(message) {
   fs.appendFileSync(logFile, message + "\n");
 }
 
+// Obtener el valor desencriptado de passadmin
 async function getDecryptedPassadmin() {
   try {
     return await decryptData(`${DBPassword}`);
@@ -401,8 +428,4 @@ async function getDecryptedPassadmin() {
   }
 }
 
-if (require.main === module) {
-  (async () => {
-    await IniciaejecutarArchivos();
-  })();
-}
+IniciaejecutarArchivos();
