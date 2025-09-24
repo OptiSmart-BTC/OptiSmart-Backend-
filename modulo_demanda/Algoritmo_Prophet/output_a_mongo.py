@@ -71,7 +71,10 @@ def main(db_name, collection_name, mongo_uri, min_registros, max_porcentaje_cero
     df_historico, db = obtener_datos_desde_mongo(mongo_uri, db_name, collection_name)
 
     # Importar la función ejecutar_pipeline del script de pipeline
-    from pipeline_prophet import ejecutar_pipeline
+    # from pipeline_prophet import ejecutar_pipeline
+
+    # Importar la función ejecutar_pipelineV2 del script de pipeline
+    from pipeline_prophet_V2 import ejecutar_pipeline
 
     # Ejecutar el pipeline y obtener los resultados
     datos_futuros_mongo_df, df_metricas = ejecutar_pipeline(

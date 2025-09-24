@@ -14,7 +14,7 @@ async function ejecutarClasificacion() {
     try {
         const passadminDeCripta = await getDecryptedPassadmin();
         const mongoUrl = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/?authSource=admin`;
-        const pythonScript = path.join(__dirname, 'ejecutable_clasificador.py');
+        const pythonScript = path.join(__dirname, 'ejecutable_clasificador_V2.py');
         const userCollection = `historico_demanda_${appuser}`;
         const resultCollection = `clasificacion_demanda_${appuser}`;
         const command = `python ${pythonScript} "${dbName}" "${userCollection}" "${resultCollection}" "${mongoUrl}"`;

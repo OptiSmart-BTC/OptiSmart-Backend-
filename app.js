@@ -3855,11 +3855,15 @@ app.get('/obtenerClasificacion', (req, res) => {
   console.log(`Ejecutando: ${command}`);
 
   // Ejecutar el script
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.error('Error al ejecutar el script:', error);
-      return res.status(500).send(`Error al obtener datos de clasificación: ${error.message}`);
-    }
+exec(command, { maxBuffer : 1024 * 2048 *10 }, (error, stdout , stderr ) => { 
+  if (error){
+    console.error('Error al ejecutar el script', error);
+    return res.status(500).send('Error al obtener los datos de la clasificacion');
+  }
+  if(stderr){
+    console.error('Error en el scrpt:', sderr);
+    return res.status(500).send('Error al obtener los datos de la clasificacion');
+  }
 
     console.log('Salida del script (stdout):', stdout);
     if (stderr && stderr.trim()) {

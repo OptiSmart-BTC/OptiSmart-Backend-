@@ -13,7 +13,7 @@ const DBPassword = process.argv.slice(2)[2];
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`; // Cambia esta ruta según la ubicación de tu archivo CSV
+const logFile = `../../${parametroFolder}/log/PlanReposicion_sem.log`; // Cambia esta ruta según la ubicación de tu archivo CSV
 
 
 //const url = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
@@ -22,7 +22,7 @@ const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
 
 
 const collectionsToDelete = [
-  'plan_reposicion_01_se,',
+  'plan_reposicion_01_sem',
   'ui_sem_plan_reposicion'
 ];
 
