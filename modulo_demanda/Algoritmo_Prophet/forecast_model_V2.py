@@ -119,7 +119,6 @@ def realizar_validacion_cruzada_segura(model: Prophet, df_prophet: pd.DataFrame,
     - W-MON -> 7 días por paso
     """
     step_days = _days_per_step(freq)
-
     total_days = (df_prophet['ds'].max() - df_prophet['ds'].min()).days
     if total_days <= 0:
         return pd.DataFrame(), pd.DataFrame()
