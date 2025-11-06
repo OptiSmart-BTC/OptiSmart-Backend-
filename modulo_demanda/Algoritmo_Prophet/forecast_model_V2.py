@@ -13,13 +13,13 @@ def _is_weekly(freq: str) -> bool:
 def _is_monthly(freq: str) -> bool:
     return isinstance(freq, str) and (freq.upper().startswith("M") or freq.upper() == "MS")
 
+def _is_daily(freq: str) -> bool:
+    return isinstance(freq, str) and freq.upper() == "D"
+
 def _days_per_step(freq: str) -> int:
-    # Aprox razonables para CV
-    if _is_weekly(freq):
-        return 7
-    if _is_monthly(freq):
-        return 30
-    return 1  # fallback (diario)
+    if _is_weekly(freq):  return 7
+    if _is_monthly(freq): return 30
+    return 1  # diario por defecto
 
 # ---------------------------------------------
 # Configura la estacionalidad del modelo Prophet
@@ -30,27 +30,24 @@ def prophet_configuration(
     changepoint_prior_scale: float = 0.05,
     seasonality_prior_scale: float = 10.0
 ):
-    """
-    Ajusta estacionalidades según frecuencia:
-    - Semanal: weekly=True, yearly=True
-    - Mensual: weekly=False, yearly=True (se mantiene 'monthly' y 'quarterly' explícitas)
-    """
-    weekly_flag = _is_weekly(freq)
+    is_daily  = _is_daily(freq)
+    is_weekly = _is_weekly(freq)
+    # En diario conviene weekly=True y daily=True
     model = Prophet(
-        weekly_seasonality=weekly_flag,
-        yearly_seasonality=True,
-        daily_seasonality=False,
-        n_changepoints=n_changepoints,
-        changepoint_prior_scale=changepoint_prior_scale,
-        seasonality_prior_scale=seasonality_prior_scale,
+        daily_seasonality = is_daily,
+        weekly_seasonality = (is_daily or is_weekly),
+        yearly_seasonality = True,
+        n_changepoints = n_changepoints,
+        changepoint_prior_scale = changepoint_prior_scale,
+        seasonality_prior_scale = seasonality_prior_scale,
     )
     model.add_country_holidays(country_name='MX')
 
-    # Estacionalidades adicionales útiles para retail
+    # Para mensual/semanal mantenemos estacionalidades explícitas útiles retail
+    # En diario también ayudan como tendencia de mediano plazo
     model.add_seasonality(name='monthly',   period=30.5,  fourier_order=5)
     model.add_seasonality(name='quarterly', period=91.25, fourier_order=3)
 
-    # Regresores de calendario (son robustos tanto para MS como W-MON)
     model.add_regressor('day_of_week')
     model.add_regressor('week_of_year')
     model.add_regressor('month')
@@ -123,8 +120,7 @@ def realizar_validacion_cruzada_segura(model: Prophet, df_prophet: pd.DataFrame,
     if total_days <= 0:
         return pd.DataFrame(), pd.DataFrame()
 
-    # 60% / 20% / 20% en pasos de la frecuencia
-    total_steps = max(1, len(df_prophet) - 1)
+    total_steps  = max(1, len(df_prophet) - 1)
     initial_steps = max(1, int(total_steps * 0.6))
     period_steps  = max(1, int(total_steps * 0.2))
     horizon_steps = max(1, total_steps - initial_steps - period_steps)
@@ -138,13 +134,14 @@ def realizar_validacion_cruzada_segura(model: Prophet, df_prophet: pd.DataFrame,
     if horizon_days <= 0 or (initial_days + horizon_days) >= total_days:
         return pd.DataFrame(), pd.DataFrame()
 
-    init_str = f"{initial_days} days"
-    per_str  = f"{period_days} days"
-    hor_str  = f"{horizon_days} days"
-
     try:
-        df_cv = cross_validation(model, initial=init_str, period=per_str, horizon=hor_str)
-        df_p  = performance_metrics(df_cv)
+        df_cv = cross_validation(
+            model,
+            initial=f"{initial_days} days",
+            period=f"{period_days} days",
+            horizon=f"{horizon_days} days",
+        )
+        df_p = performance_metrics(df_cv)
         return df_cv, df_p
     except Exception:
         # Si falla (series cortas, etc.), devolvemos vacío sin reventar pipeline

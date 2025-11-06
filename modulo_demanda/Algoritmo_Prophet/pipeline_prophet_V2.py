@@ -1,4 +1,4 @@
-from data_cleaning_V2 import load_and_clean_data, completar_fechas, resample_if_not_weekly
+from data_cleaning_V2 import load_and_clean_data, completar_fechas, resample_to_target, _normalize_freq
 from generador_combinaciones import generate_combinations
 from valid_combinations import obtener_combinaciones_validas
 from forecast_model_V2 import (
@@ -18,11 +18,11 @@ import logging
 
 # ---------------------------------------------------------------------
 # Utilidad de diagnóstico (opcional): ver frecuencia y % de ceros
-# después del resampleo efectivo (MS o W-MON), por combinación
+# después del resampleo efectivo (D / MS / W-MON), por combinación
 # ---------------------------------------------------------------------
 def _debug_zeros_por_combinacion(df_resampleado, min_registros, max_porcentaje_ceros):
     """
-    df_resampleado: DataFrame ya resampleado a la frecuencia efectiva (MS o W-MON).
+    df_resampleado: DataFrame ya resampleado a la frecuencia efectiva (D / MS / W-MON).
     Imprime, por combinación (Producto, Canal, Ubicacion):
       - n_registros
       - % ceros
@@ -53,9 +53,7 @@ def _debug_zeros_por_combinacion(df_resampleado, min_registros, max_porcentaje_c
 def ejecutar_pipeline(df_historico, min_registros, max_porcentaje_ceros, periodo_a_predecir, imprimir_debug_zeros=True):
     """
     Pipeline maestro para entrenar/validar/predicir por combinación.
-    - Respeta frecuencia mensual si la serie original es mensual (MS),
-      preservada por data_cleaning_V2.resample_if_not_weekly.
-    - Para otras series, trabaja en semanal (W-MON).
+    - Detecta frecuencia efectiva (D / MS / W-MON) y modela en esa granularidad.
     - Aplica filtros de combinaciones válidas (min_registros, %ceros, nulos).
     - Ajusta hiperparámetros con Optuna, entrena Prophet y produce métricas.
     
@@ -83,21 +81,21 @@ def ejecutar_pipeline(df_historico, min_registros, max_porcentaje_ceros, periodo
 
     forecast_date = datetime.datetime.now().replace(microsecond=0).isoformat()
 
-    # 1) Carga + limpieza + inferencia de freq global
-    df, _freq_inicial = load_and_clean_data(df_historico)
-    # print(f"[PIPE] Frecuencia inferida inicial (global): {_freq_inicial}")
+    # Trials configurables por variable de entorno (default 3 para mantener tu comportamiento)
+    N_TRIALS = int(os.getenv("N_TRIALS", "3"))
 
-    # 2) Resampleo condicional:
-    #    - Mantiene MS si la serie es mensual,
-    #    - Devuelve W-MON si la serie es semanal,
-    #    - Caso contrario fuerza a W-MON por default.
-    df, freq = resample_if_not_weekly(df, target_freq='W-MON')
+    # 1) Carga + limpieza + inferencia de freq global
+    df, freq_inferida = load_and_clean_data(df_historico)
+    freq = _normalize_freq(freq_inferida)  # -> 'D' | 'MS' | 'W-MON'
+
+    # 2) Resampleo a la frecuencia efectiva detectada
+    df, freq = resample_to_target(df, target_freq=freq)
     print(f"[PIPE] Frecuencia efectiva para el modelado: {freq}")
 
     # 3) Rango de fechas con la freq efectiva
     rango_fechas = pd.date_range(df['Fecha'].min(), df['Fecha'].max(), freq=freq)
 
-    # 4) Combinaciones de jerarquías
+    # 4) Combinaciones de jerarquías (misma estructura que ya usabas)
     df_combinaciones = generate_combinations(df)
 
     # (Opcional) Diagnóstico de ceros antes del filtro final
@@ -109,80 +107,84 @@ def ejecutar_pipeline(df_historico, min_registros, max_porcentaje_ceros, periodo
 
     # 6) Entrenar + predecir por cada combinación válida
     for Producto, Canal, Ubicacion in combinaciones_validas:
-        # 6.1 Filtrar la combinación
-        filtered_df = df[
-            (df['Producto'] == Producto) &
-            (df['Canal'] == Canal) &
-            (df['Ubicacion'] == Ubicacion)
-        ][['Fecha', 'Cantidad']].sort_values('Fecha')
+        try:
+            # 6.1 Filtrar la combinación
+            filtered_df = df[
+                (df['Producto'] == Producto) &
+                (df['Canal'] == Canal) &
+                (df['Ubicacion'] == Ubicacion)
+            ][['Fecha', 'Cantidad']].sort_values('Fecha')
 
-        # 6.2 Completar fechas faltantes al rango con freq efectiva
-        filtered_df = completar_fechas(filtered_df, rango_fechas)
+            # 6.2 Completar fechas faltantes al rango con freq efectiva (ffill)
+            filtered_df = completar_fechas(filtered_df, rango_fechas)
 
-        # 6.3 Preparación para Prophet
-        df_prophet = data_preparation_prophet(filtered_df)
-        # print(f"[PIPE] df_prophet head para {Producto}-{Canal}-{Ubicacion}:\n{df_prophet.head()}")
+            # 6.3 Preparación para Prophet
+            df_prophet = data_preparation_prophet(filtered_df)
 
-        # 6.4 Tuning hiperparámetros
-        best = tune_hyperparams(df_prophet, freq, periodo_a_predecir, n_trials=3)
+            # 6.4 Tuning hiperparámetros (Optuna)
+            best = tune_hyperparams(df_prophet, freq, periodo_a_predecir, n_trials=N_TRIALS)
 
-        # 6.5 Configurar + entrenar
-        model = prophet_configuration(
-            freq=freq,
-            n_changepoints=best['n_changepoints'],
-            changepoint_prior_scale=best['changepoint_prior_scale'],
-            seasonality_prior_scale=best['seasonality_prior_scale']
+            # 6.5 Configurar + entrenar
+            model = prophet_configuration(
+                freq=freq,
+                n_changepoints=best['n_changepoints'],
+                changepoint_prior_scale=best['changepoint_prior_scale'],
+                seasonality_prior_scale=best['seasonality_prior_scale']
             )
-        model.fit(df_prophet)
+            model.fit(df_prophet)
 
-        # 6.6 Validación cruzada segura
-        df_cv, df_p = realizar_validacion_cruzada_segura(model, df_prophet, freq)
-        print(f"[PIPE] Rendimiento {Producto}-{Canal}-{Ubicacion}:")
-        if not df_p.empty:
-            print(df_p.head())
-        if not df_cv.empty:
-            print(df_cv.head())
+            # 6.6 Validación cruzada segura
+            df_cv, df_p = realizar_validacion_cruzada_segura(model, df_prophet, freq)
+            print(f"[PIPE] Rendimiento {Producto}-{Canal}-{Ubicacion}:")
+            if not df_p.empty:
+                print(df_p.head())
+            if not df_cv.empty:
+                print(df_cv.head())
 
-        # 6.7 Forecast futuro con freq efectiva (MS o W-MON)
-        forecast = make_forecast(model, periodo_a_predecir, freq)
-        forecast['forecast_date'] = forecast_date
+            # 6.7 Forecast futuro con freq efectiva (D / MS / W-MON)
+            forecast = make_forecast(model, periodo_a_predecir, freq)
+            forecast['forecast_date'] = forecast_date
 
-        # 6.8 Extraer solo horizonte futuro
-        #     Nota: df_prophet['ds'] llega hasta max de rango_fechas
-        #           filtered_df['Fecha'].max() es consistente con esa frontera
-        futuro = forecast[forecast['ds'] > filtered_df['Fecha'].max()].copy()
+            # 6.8 Extraer solo horizonte futuro
+            #     Nota: usamos frontera por última fecha observada de la combinación
+            frontera = filtered_df['Fecha'].max()
+            futuro = forecast[forecast['ds'] > frontera].copy()
 
-        # Formatear columnas para Mongo
-        futuro = futuro.rename(columns={'ds': 'Fecha', 'yhat': 'Demanda Predicha'})
-        futuro['Producto'] = Producto
-        futuro['Canal'] = Canal
-        futuro['Ubicacion'] = Ubicacion
-        futuro = futuro[['Producto', 'Canal', 'Ubicacion', 'Fecha', 'Demanda Predicha', 'forecast_date']]
-        datos_futuros_mongo.append(futuro)
+            # Formatear columnas para Mongo
+            futuro = futuro.rename(columns={'ds': 'Fecha', 'yhat': 'Demanda Predicha'})
+            futuro['Producto'] = Producto
+            futuro['Canal'] = Canal
+            futuro['Ubicacion'] = Ubicacion
+            futuro = futuro[['Producto', 'Canal', 'Ubicacion', 'Fecha', 'Demanda Predicha', 'forecast_date']]
+            datos_futuros_mongo.append(futuro)
 
-        # 6.9 Unir predicciones con reales (para métricas)
-        df_merged = join_predictions(df_prophet, forecast)
+            # 6.9 Unir predicciones con reales (para métricas)
+            df_merged = join_predictions(df_prophet, forecast)
 
-        # 6.10 Métricas por combinación
-        wmape_percentage, smape_percentage, df_merged_con_mape = calculate_metrics(df_merged)
-        metricas_combinaciones.append({
-            'Producto': Producto,
-            'Canal': Canal,
-            'Ubicacion': Ubicacion,
-            'WMAPE': wmape_percentage,
-            'SMAPE': smape_percentage
-        })
+            # 6.10 Métricas por combinación
+            wmape_percentage, smape_percentage, df_merged_con_mape = calculate_metrics(df_merged)
+            metricas_combinaciones.append({
+                'Producto': Producto,
+                'Canal': Canal,
+                'Ubicacion': Ubicacion,
+                'WMAPE': wmape_percentage,
+                'SMAPE': smape_percentage
+            })
 
-        # 6.11 Guardar resultados completos (opcional, útil para gráficas)
-        df_red = (
-            df_merged
-            .reset_index()[['ds', 'y', 'yhat', 'MAPE']]
-            .rename(columns={'ds': 'Fecha', 'y': 'Demanda Real', 'yhat': 'Demanda Predicha'})
-        )
-        df_red['Producto'] = Producto
-        df_red['Canal'] = Canal
-        df_red['Ubicacion'] = Ubicacion
-        resultados_forecast.append(df_red)
+            # 6.11 Guardar resultados completos (opcional, útil para gráficas)
+            df_red = (
+                df_merged
+                .reset_index()[['ds', 'y', 'yhat', 'MAPE']]
+                .rename(columns={'ds': 'Fecha', 'y': 'Demanda Real', 'yhat': 'Demanda Predicha'})
+            )
+            df_red['Producto'] = Producto
+            df_red['Canal'] = Canal
+            df_red['Ubicacion'] = Ubicacion
+            resultados_forecast.append(df_red)
+
+        except Exception as e:
+            # No detenemos el batch por un DFU; registramos y seguimos
+            print(f"[ERROR] DFU {Producto}-{Canal}-{Ubicacion}: {e}")
 
     # 7) Concatenar outputs
     df_todos = pd.concat(resultados_forecast, ignore_index=True) if resultados_forecast else pd.DataFrame()
