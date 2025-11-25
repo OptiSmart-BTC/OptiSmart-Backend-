@@ -39,7 +39,8 @@ try {
     { nombre: 'ValidaCSV_HistoricoDemanda_TipodeDato_v4.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
     { nombre: 'loadCSVHistDmd_v5.js', parametros: `${dbName} ${parametroFolder} ${AppUser} "${csvFileToProcess}"` },
     { nombre: 'Mueve_HistoricoCSVProcesados_v2.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
-    { nombre: 'LimpiaEspaciosHistorico_v2.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
+    //{ nombre: 'LimpiaEspaciosHistorico_v2.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
+    { nombre: 'LimpiaEspaciosHistorico_v3.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
     { nombre: 'ValidaCSV_Integridad_DFU_V7.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
     // { nombre: 'Calcula_Hist_FechasyRango_v2.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   ];

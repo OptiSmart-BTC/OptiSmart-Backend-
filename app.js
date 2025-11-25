@@ -22,6 +22,8 @@ const { ensurePlannerIndexes } = require('./modulo_demanda/planner/db/planner.in
 const {
   cleanupAllOpenSessions,
 } = require('./modulo_demanda/planner/api/planner.service'); 
+const { Server } = require("socket.io");
+//const { attachPlannerHub } = require("./modulo_demanda/planner/realtime/planner.hub"); 
 // === [Planner] END imports ===
 
 
@@ -149,6 +151,33 @@ console.log(`Modulo de demanda:Planner >> Sesion cerrada debido a inactividad. B
   }
 }
 
+// =============================================
+// ===    CONECTAR PLANNER.HUB DINÁMICO     ====
+// =============================================
+/*
+const HUBS = {};
+
+async function connectHubForTenant(appUser, dbName) {
+  const key = `${appUser}::${dbName}`;
+  if (HUBS[key]) return;
+
+  console.log(`[PlannerHub] Conectando hub para: ${key}`);
+
+  const db = await getDb(appUser, dbName);
+  attachPlannerHub({ io, db });
+
+  HUBS[key] = true;
+  console.log(`[PlannerHub] Hub inicializado para tenant ${key}`);
+}
+
+// Conectar hubs para todos los tenants registrados (similar a tenantSweeper)
+setInterval(async () => {
+  for (const key of ACTIVE_TENANTS) {
+    const [appUser, dbName] = key.split("::");
+    await connectHubForTenant(appUser, dbName);
+  }
+}, 3000);
+*/
 // ----------------------
 // Timer global (cada hora) 
 // ----------------------
@@ -3799,6 +3828,7 @@ app.post("/api/create-user", (req, res) => {
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
 // Iniciar el servidor
 const http = require("http");
 
@@ -3818,6 +3848,68 @@ const http = require("http");
 // Suponiendo que `app` ya está definido en otro archivo:
 http.createServer(app).listen(3000, () => {
   console.log("Servidor HTTP iniciado en http://localhost:3000");
+});
+*/
+
+// INICIAR SERVIDOR CON SOCKET.IO
+
+const http = require("http");
+
+const PORT = process.env.PORT || 3000;
+
+// Crear servidor HTTP a partir de la app de Express
+const httpServer = http.createServer(app);
+
+// Inicializar Socket.io sobre este servidor
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", // si quieres, cámbialo luego a la URL específica de tu frontend
+    methods: ["GET", "POST"],
+    allowedHeaders: ["x-app-user", "x-db-name", "content-type"],
+  },
+});
+
+// Middleware de auth muy simple basado en el header x-app-user
+io.use((socket, next) => {
+  const { appUser, dbName } = socket.handshake.auth || {};
+
+  if (!appUser) {
+    console.warn("Socket rechazado por falta de appUser en auth");
+    return next(new Error("appUser requerido"));
+  }
+
+  socket.appUser = appUser;
+  socket.dbName = dbName; // opcional, por si luego quieres usarlo
+  next();
+});
+
+// Eventos de conexión de Planner
+io.on("connection", (socket) => {
+  console.log("Socket conectado:", socket.id, "user:", socket.appUser);
+
+  // El frontend hace: s.emit("planner:join", { session_id })
+socket.on("planner:join", ({ session_id }) => {
+  if (!session_id) return;
+  socket.join(`planner:${session_id}`);
+  console.log(`Socket ${socket.id} entró a sesión planner:${session_id}`);
+});
+
+socket.on("planner:leave", ({ session_id }) => {
+  if (!session_id) return;
+  socket.leave(`planner:${session_id}`);
+  console.log(`Socket ${socket.id} salió de sesión planner:${session_id}`);
+});
+
+  socket.on("disconnect", (reason) => {
+    console.log("Socket desconectado:", socket.id, "razón:", reason);
+  });
+});
+
+// Hacer accesible `io` desde otros módulos/rutas
+app.set("io", io);
+
+httpServer.listen(PORT, () => {
+  console.log(`Servidor HTTP + Socket.io iniciado en http://localhost:${PORT}`);
 });
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&

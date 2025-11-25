@@ -3,15 +3,14 @@ const { ObjectId } = require('mongodb');
 
 /* ========================== DEBUG ========================== */
 // Activa/desactiva logs de YoY
-const DEBUG_YOY = true;
-// Limita el ruido a un combo específico (ajústalo a lo que estés probando)
-const DEBUG_FILTER = {
-  Producto: 'BMX_1727',
-  Canal: 'BMX_AUTOSERVICIOS',
-  Ubicacion: 'BMX_3001'
-};
+const DEBUG_YOY = false;
+
 function sameCombo(a, b) {
-  return a.Producto === b.Producto && a.Canal === b.Canal && a.Ubicacion === b.Ubicacion;
+  return (
+    a.Producto === b.Producto &&
+    a.Canal === b.Canal &&
+    a.Ubicacion === b.Ubicacion
+  );
 }
 function dbg(...args) {
   if (DEBUG_YOY) console.log('[planner:YOY]', ...args);
@@ -38,7 +37,9 @@ function addMonthsUTC(dateUTC, n) {
   const m = dateUTC.getUTCMonth() + n;
   const d = dateUTC.getUTCDate();
   const first = new Date(Date.UTC(y, m, 1));
-  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const lastDay = new Date(
+    Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)
+  ).getUTCDate();
   const dd = Math.min(d, lastDay);
   return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), dd));
 }
@@ -48,7 +49,9 @@ function addYearsUTC(dateUTC, n) {
   const m = dateUTC.getUTCMonth();
   const d = dateUTC.getUTCDate();
   const first = new Date(Date.UTC(y, m, 1));
-  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const lastDay = new Date(
+    Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)
+  ).getUTCDate();
   const dd = Math.min(d, lastDay);
   return new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), dd));
 }
@@ -61,32 +64,40 @@ function toUTC00(date) {
 
 // Helpers semanales en UTC (sin tocar TZ de tus datos)
 function addDaysUTC(dateUTC, days) {
-  return new Date(Date.UTC(
-    dateUTC.getUTCFullYear(),
-    dateUTC.getUTCMonth(),
-    dateUTC.getUTCDate() + days
-  ));
+  return new Date(
+    Date.UTC(
+      dateUTC.getUTCFullYear(),
+      dateUTC.getUTCMonth(),
+      dateUTC.getUTCDate() + days
+    )
+  );
 }
 function startOfISOWeekUTC(dateUTC) {
-  const d = new Date(Date.UTC(
-    dateUTC.getUTCFullYear(),
-    dateUTC.getUTCMonth(),
-    dateUTC.getUTCDate()
-  ));
+  const d = new Date(
+    Date.UTC(
+      dateUTC.getUTCFullYear(),
+      dateUTC.getUTCMonth(),
+      dateUTC.getUTCDate()
+    )
+  );
   const dow = d.getUTCDay(); // 0=Dom,1=Lun,...6=Sab
-  const delta = (dow === 0 ? -6 : 1 - dow);
+  const delta = dow === 0 ? -6 : 1 - dow;
   d.setUTCDate(d.getUTCDate() + delta);
-  d.setUTCHours(0,0,0,0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
 function tryHintFecha1(cursor) {
-  try { return cursor.hint({ Fecha: 1 }); } catch { return cursor; }
+  // try { return cursor.hint({ Fecha: 1 }); } catch { return cursor; }
+  return cursor;
 }
 
 /* ========================== SESIONES ========================== */
 
-async function openOrGetActiveSession(db, { dbName, freq = 'W-MON', appUser = null }) {
+async function openOrGetActiveSession(
+  db,
+  { dbName, freq = 'W-MON', appUser = null }
+) {
   const sessions = db.collection('planner_sessions');
   const now = new Date();
 
@@ -95,9 +106,10 @@ async function openOrGetActiveSession(db, { dbName, freq = 'W-MON', appUser = nu
   if (session) return session;
 
   // 2) Tomar la forecast_date más reciente del forecast activo
-  const last = await db.collection('demand_forecast_actual').aggregate([
-    { $group: { _id: null, maxFd: { $max: "$forecast_date" } } }
-  ]).toArray();
+  const last = await db
+    .collection('demand_forecast_actual')
+    .aggregate([{ $group: { _id: null, maxFd: { $max: '$forecast_date' } } }])
+    .toArray();
 
   // Usa helper existente si ya lo tienes; si no, cae a now
   const forecast_date = toDateSafe?.(last[0]?.maxFd) || new Date();
@@ -111,7 +123,7 @@ async function openOrGetActiveSession(db, { dbName, freq = 'W-MON', appUser = nu
   const doc = {
     session_id,
     db_name: dbName,
-    app_user: appUser,        // <- importante para multi-tenant
+    app_user: appUser, // <- importante para multi-tenant
     owner: null,
     type: 'shared',
     status: 'open',
@@ -126,10 +138,13 @@ async function openOrGetActiveSession(db, { dbName, freq = 'W-MON', appUser = nu
   return doc;
 }
 
-
 /* ========================== BOOTSTRAP ========================== */
 /**
- * Copia 1:1 de demand_forecast_actual (rango), y enriquece planner_cells con:
+ * Copia 1:1 de *ambas* colecciones:
+ *   - demand_forecast (histórico, se toma el último forecast_date por DFU+Fecha)
+ *   - demand_forecast_actual (activo, tiene prioridad sobre histórico)
+ *
+ * y enriquece planner_cells con:
  *  - base_fcst  : "Demanda Predicha"
  *  - plan_fcst  : "Demanda Planeada" (si existe) o base_fcst
  *  - actual     : histórico en la misma Fecha
@@ -143,7 +158,7 @@ async function bootstrapSession(db, {
   anchorDate,
   pastMonths = 0,
   futureMonths = 0,
-  yoyMode
+  yoyMode, // 'month' | 'week' | 'day'
 }) {
   const sessions = db.collection('planner_sessions');
   const cells = db.collection('planner_cells');
@@ -154,83 +169,214 @@ async function bootstrapSession(db, {
   // Fallback: si no mandan yoyMode, lo deducimos de la freq de la sesión
   if (!yoyMode) {
     const srcFreq = String(session?.source?.freq || '').toUpperCase();
-    yoyMode = srcFreq.startsWith('W') ? 'week' : (srcFreq === 'D' ? 'day' : 'month');
+    if (srcFreq.startsWith('W')) yoyMode = 'week';
+    else if (srcFreq === 'D') yoyMode = 'day';
+    else yoyMode = 'month';
   }
 
   if (DEBUG_YOY) {
     console.log('[planner] bootstrap IN', {
-      session_id, appUser, yoyMode, fromDate, toDate, anchorDate
+      session_id,
+      appUser,
+      yoyMode,
+      fromDate,
+      toDate,
+      anchorDate,
     });
   }
 
   // ---- Rango efectivo ----
+// ---- Rango efectivo ----
   let minDate = toDateSafe(fromDate);
   let maxDate = toDateSafe(toDate);
+
   if (!minDate || !maxDate) {
     let anchor = toDateSafe(anchorDate);
     if (!anchor) {
-      const last = await db.collection('demand_forecast_actual').aggregate([
-        { $group: { _id: null, maxFecha: { $max: "$Fecha" } } }
-      ]).toArray();
+      const last = await db
+        .collection('demand_forecast_actual')
+        .aggregate([{ $group: { _id: null, maxFecha: { $max: '$Fecha' } } }])
+        .toArray();
       anchor = toDateSafe(last[0]?.maxFecha) || new Date();
     }
-    const start = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - pastMonths, 1));
-    const endStart = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + futureMonths + 1, 1));
-    const end = new Date(endStart.getTime() - 1);
-    minDate = start; maxDate = end;
+
+    // Usamos yoyMode como proxy de la frecuencia para definir "periodos"
+    const windowMode = String(yoyMode).toLowerCase();
+    const isWeekWindow = windowMode === 'week';
+    const isDayWindow = windowMode === 'day';
+
+    if (isDayWindow) {
+      // 👉 past/future = N días
+      // Ejemplo: past=2, future=5  → 2 días antes + anchor + 5 días después
+      minDate = addDaysUTC(anchor, -pastMonths);
+      maxDate = addDaysUTC(anchor, futureMonths);
+    } else if (isWeekWindow) {
+      // 👉 past/future = N semanas
+      //  -pastMonths semanas hacia atrás, +futureMonths hacia adelante
+      //  (usando 7 días por semana)
+      minDate = addDaysUTC(anchor, -7 * pastMonths);
+      maxDate = addDaysUTC(anchor, 7 * futureMonths);
+    } else {
+      // 👉 Modo mensual (comportamiento actual)
+      const start = new Date(
+        Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - pastMonths, 1)
+      );
+      const endStart = new Date(
+        Date.UTC(
+          anchor.getUTCFullYear(),
+          anchor.getUTCMonth() + futureMonths + 1,
+          1
+        )
+      );
+      const end = new Date(endStart.getTime() - 1);
+      minDate = start;
+      maxDate = end;
+    }
   }
 
   dbg('Rango efectivo:', {
     minDateISO: minDate?.toISOString(),
-    maxDateISO: maxDate?.toISOString()
+    maxDateISO: maxDate?.toISOString(),
   });
 
-  // ---- Base rows: copia exacta de demand_forecast_actual ----
-  const baseCur = db.collection('demand_forecast_actual').find(
-    { Fecha: { $gte: minDate, $lte: maxDate } },
-    { projection: { _id:0, Producto:1, Canal:1, Ubicacion:1, Fecha:1, 'Demanda Predicha':1, 'Demanda Planeada':1 } }
-  );
+  // ---- Base rows: demanda histórica + forecast actual ----
+  const baseMap = new Map(); // key: Producto|Canal|Ubicacion|FechaISO
 
-  const baseRows = [];
-  for await (const b of baseCur) {
-    const f = toUTC00(b.Fecha);
-    const baseVal = b['Demanda Predicha'] == null ? null : Number(b['Demanda Predicha']);
-    const planVal = (b['Demanda Planeada'] != null) ? Number(b['Demanda Planeada']) : baseVal;
+  function upsertBase(doc, source) {
+    const f = toUTC00(doc.Fecha);
+    const key = `${doc.Producto}|${doc.Canal}|${doc.Ubicacion}|${f.toISOString()}`;
+    const baseVal =
+      doc['Demanda Predicha'] == null ? null : Number(doc['Demanda Predicha']);
+    const planVal =
+      doc['Demanda Planeada'] != null
+        ? Number(doc['Demanda Planeada'])
+        : baseVal;
+    const fd = toDateSafe(doc.forecast_date) || new Date(0);
 
-    baseRows.push({
-      Producto: b.Producto,
-      Canal: b.Canal,
-      Ubicacion: b.Ubicacion,
-      Fecha: f,
-      baseVal,
-      planVal
-    });
+    const prev = baseMap.get(key);
+    if (!prev) {
+      baseMap.set(key, {
+        Producto: doc.Producto,
+        Canal: doc.Canal,
+        Ubicacion: doc.Ubicacion,
+        Fecha: f,
+        baseVal,
+        planVal,
+        forecast_date: fd,
+        source,
+      });
+      return;
+    }
+
+    // Prioridad:
+    //  - Si el nuevo es "actual", siempre gana.
+    //  - Si ambos son del mismo tipo, gana el de forecast_date más reciente.
+    if (source === 'actual' && prev.source !== 'actual') {
+      baseMap.set(key, {
+        ...prev,
+        baseVal,
+        planVal,
+        forecast_date: fd,
+        source,
+      });
+    } else if (source === prev.source && fd > prev.forecast_date) {
+      baseMap.set(key, {
+        ...prev,
+        baseVal,
+        planVal,
+        forecast_date: fd,
+        source,
+      });
+    }
   }
+
+  // 1) Histórico: demand_forecast
+  const histCur = db.collection('demand_forecast').find(
+    { Fecha: { $gte: minDate, $lte: maxDate } },
+    {
+      projection: {
+        _id: 0,
+        Producto: 1,
+        Canal: 1,
+        Ubicacion: 1,
+        Fecha: 1,
+        'Demanda Predicha': 1,
+        'Demanda Planeada': 1,
+        forecast_date: 1,
+      },
+    }
+  );
+  for await (const h of histCur) {
+    upsertBase(h, 'historical');
+  }
+
+  // 2) Activo: demand_forecast_actual (pinta encima del histórico)
+  const actCur = db.collection('demand_forecast_actual').find(
+    { Fecha: { $gte: minDate, $lte: maxDate } },
+    {
+      projection: {
+        _id: 0,
+        Producto: 1,
+        Canal: 1,
+        Ubicacion: 1,
+        Fecha: 1,
+        'Demanda Predicha': 1,
+        'Demanda Planeada': 1,
+        forecast_date: 1,
+      },
+    }
+  );
+  for await (const b of actCur) {
+    upsertBase(b, 'actual');
+  }
+
+  const baseRows = Array.from(baseMap.values()).map(
+    ({ forecast_date, source, ...rest }) => rest
+  );
 
   dbg('baseRows count:', baseRows.length);
   if (DEBUG_YOY) {
-    const sample = baseRows.slice(0, 5).map(r => ({
-      Producto: r.Producto, Canal: r.Canal, Ubicacion: r.Ubicacion, Fecha: r.Fecha.toISOString()
+    const sample = baseRows.slice(0, 5).map((r) => ({
+      Producto: r.Producto,
+      Canal: r.Canal,
+      Ubicacion: r.Ubicacion,
+      Fecha: r.Fecha.toISOString(),
     }));
     dbg('base sample:', sample);
   }
 
   if (!baseRows.length) {
-    await sessions.updateOne({ _id: session._id }, { $set: { updated_at: new Date() } });
+    await sessions.updateOne(
+      { _id: session._id },
+      { $set: { updated_at: new Date() } }
+    );
     return { inserted: 0, rows: 0, combos: 0, periods: 0 };
   }
 
   const historico = db.collection(`historico_demanda_${appUser}`);
-  const comboSet = new Set(baseRows.map(r => `${r.Producto}|${r.Canal}|${r.Ubicacion}`));
+  const comboSet = new Set(
+    baseRows.map((r) => `${r.Producto}|${r.Canal}|${r.Ubicacion}`)
+  );
 
   // ---- REAL: mismas fechas exactas ----
-  const realDates = Array.from(new Set(baseRows.map(r => r.Fecha.getTime()))).map(t => new Date(t));
+  const realDates = Array.from(
+    new Set(baseRows.map((r) => r.Fecha.getTime()))
+  ).map((t) => new Date(t));
   const realMap = new Map();
-  for (let i=0; i<realDates.length; i+=1000) {
-    const chunk = realDates.slice(i, i+1000);
+  for (let i = 0; i < realDates.length; i += 1000) {
+    const chunk = realDates.slice(i, i + 1000);
     let cur = historico.find(
       { Fecha: { $in: chunk } },
-      { projection: { _id:0, Producto:1, Canal:1, Ubicacion:1, Fecha:1, Cantidad:1 } }
+      {
+        projection: {
+          _id: 0,
+          Producto: 1,
+          Canal: 1,
+          Ubicacion: 1,
+          Fecha: 1,
+          Cantidad: 1,
+        },
+      }
     );
     cur = tryHintFecha1(cur);
     for await (const h of cur) {
@@ -244,38 +390,49 @@ async function bootstrapSession(db, {
   // ---- prev_year: month | week | day ----
   const mode = String(yoyMode).toLowerCase();
   const isWeekYoY = mode === 'week';
-  const isDayYoY  = mode === 'day';
+  const isDayYoY = mode === 'day';
   dbg('isWeekYoY?', isWeekYoY, '| isDayYoY?', isDayYoY);
 
   // Fechas del año/periodo previo "exactas"
-  const yoyPrevDatesExact = Array.from(new Set(
-    baseRows.map(r => {
-      const base = toUTC00(r.Fecha);
-      if (isWeekYoY) return addDaysUTC(base, -7*52).getTime();  // semana previa (52w)
-      if (isDayYoY)  return addYearsUTC(base, -1).getTime();    // mismo día -1y
-      return addMonthsUTC(base, -12).getTime();                  // mismo día de mes -12m
-    })
-  )).map(t => new Date(t));
+  const yoyPrevDatesExact = Array.from(
+    new Set(
+      baseRows.map((r) => {
+        const base = toUTC00(r.Fecha);
+        if (isWeekYoY) return addDaysUTC(base, -7 * 52).getTime(); // semana previa (52w)
+        if (isDayYoY) return addYearsUTC(base, -1).getTime(); // mismo día -1y
+        return addMonthsUTC(base, -12).getTime(); // mismo día de mes -12m
+      })
+    )
+  ).map((t) => new Date(t));
 
   dbg('yoyPrevDatesExact size:', yoyPrevDatesExact.length);
   if (isWeekYoY) {
-    const rowsCombo = baseRows.filter(r => sameCombo(r, DEBUG_FILTER));
-    const peek = rowsCombo.slice(0, 3).map(r => ({
+    const rowsCombo = baseRows.filter((r) => sameCombo(r, DEBUG_FILTER));
+    const peek = rowsCombo.slice(0, 3).map((r) => ({
       base: r.Fecha.toISOString(),
-      prevExact: addDaysUTC(r.Fecha, -7*52).toISOString(),
+      prevExact: addDaysUTC(r.Fecha, -7 * 52).toISOString(),
       mondayBase: startOfISOWeekUTC(r.Fecha).toISOString(),
-      mondayPrev: addDaysUTC(startOfISOWeekUTC(r.Fecha), -7*52).toISOString()
+      mondayPrev: addDaysUTC(startOfISOWeekUTC(r.Fecha), -7 * 52).toISOString(),
     }));
     dbg('peek weekly (combo filtro):', peek);
   }
 
   // Prefetch exacto y remapeo a fecha base (+12m / +52w / +1y)
   const yoyExactMap = new Map(); // combo|baseISO -> Cantidad
-  for (let i=0; i<yoyPrevDatesExact.length; i+=1000) {
-    const chunk = yoyPrevDatesExact.slice(i, i+1000);
+  for (let i = 0; i < yoyPrevDatesExact.length; i += 1000) {
+    const chunk = yoyPrevDatesExact.slice(i, i + 1000);
     let cur = historico.find(
       { Fecha: { $in: chunk } },
-      { projection: { _id:0, Producto:1, Canal:1, Ubicacion:1, Fecha:1, Cantidad:1 } }
+      {
+        projection: {
+          _id: 0,
+          Producto: 1,
+          Canal: 1,
+          Ubicacion: 1,
+          Fecha: 1,
+          Cantidad: 1,
+        },
+      }
     );
     cur = tryHintFecha1(cur);
     for await (const h of cur) {
@@ -283,9 +440,9 @@ async function bootstrapSession(db, {
       if (!comboSet.has(keyComboPrev)) continue;
       const fPrev = toUTC00(h.Fecha);
       let fCurr;
-      if (isWeekYoY)      fCurr = addDaysUTC(fPrev, 7*52);
-      else if (isDayYoY)  fCurr = addYearsUTC(fPrev, 1);
-      else                fCurr = addMonthsUTC(fPrev, 12);
+      if (isWeekYoY) fCurr = addDaysUTC(fPrev, 7 * 52);
+      else if (isDayYoY) fCurr = addYearsUTC(fPrev, 1);
+      else fCurr = addMonthsUTC(fPrev, 12);
 
       const k = `${keyComboPrev}|${fCurr.toISOString()}`;
       yoyExactMap.set(k, Number(h.Cantidad));
@@ -299,25 +456,34 @@ async function bootstrapSession(db, {
     const prevMondays = [];
     for (const r of baseRows) {
       const mondayBase = startOfISOWeekUTC(r.Fecha);
-      const prevMon = addDaysUTC(mondayBase, -7*52);
+      const prevMon = addDaysUTC(mondayBase, -7 * 52);
       const iso = prevMon.toISOString();
       if (!seenPrevMondays.has(iso)) {
         seenPrevMondays.add(iso);
         prevMondays.push(prevMon);
       }
     }
-    for (let i=0; i<prevMondays.length; i+=1000) {
-      const chunk = prevMondays.slice(i, i+1000);
+    for (let i = 0; i < prevMondays.length; i += 1000) {
+      const chunk = prevMondays.slice(i, i + 1000);
       let cur = historico.find(
         { Fecha: { $in: chunk } },
-        { projection: { _id:0, Producto:1, Canal:1, Ubicacion:1, Fecha:1, Cantidad:1 } }
+        {
+          projection: {
+            _id: 0,
+            Producto: 1,
+            Canal: 1,
+            Ubicacion: 1,
+            Fecha: 1,
+            Cantidad: 1,
+          },
+        }
       );
       cur = tryHintFecha1(cur);
       for await (const h of cur) {
         const keyComboPrev = `${h.Producto}|${h.Canal}|${h.Ubicacion}`;
         if (!comboSet.has(keyComboPrev)) continue;
         const prevMon = startOfISOWeekUTC(h.Fecha); // lunes -52w
-        const currMon = addDaysUTC(prevMon, 7*52);  // lunes base
+        const currMon = addDaysUTC(prevMon, 7 * 52); // lunes base
         const k = `${keyComboPrev}|${currMon.toISOString()}`;
         yoyMonMap.set(k, Number(h.Cantidad));
       }
@@ -327,12 +493,13 @@ async function bootstrapSession(db, {
   dbg('maps sizes:', {
     realMap: realMap.size,
     yoyExactMap: yoyExactMap.size,
-    yoyMonMap: yoyMonMap.size
+    yoyMonMap: yoyMonMap.size,
   });
 
   // ---- UPSERT planner_cells ----
   const ops = [];
-  const combos = new Set(), periods = new Set();
+  const combos = new Set(),
+    periods = new Set();
 
   for (const row of baseRows) {
     const { Producto, Canal, Ubicacion, Fecha, baseVal, planVal } = row;
@@ -372,19 +539,25 @@ async function bootstrapSession(db, {
     if (prevYear == null && isWeekYoY) {
       try {
         const mondayBase = startOfISOWeekUTC(Fecha);
-        const prevMon = addDaysUTC(mondayBase, -7*52);
+        const prevMon = addDaysUTC(mondayBase, -7 * 52);
         const prevSun = addDaysUTC(prevMon, 7);
-        const punt = await historico.findOne({
-          Producto, Canal, Ubicacion,
-          Fecha: { $gte: prevMon, $lt: prevSun }
-        }, { projection: { _id:0, Cantidad:1, Fecha:1 } });
-        if (isDebugCombo) dbg('puntual weekPrev:', {
-          prevMon: prevMon.toISOString(),
-          prevSun: prevSun.toISOString(),
-          found: !!punt,
-          Fecha: punt?.Fecha ? toUTC00(punt.Fecha).toISOString() : null,
-          Cantidad: punt?.Cantidad ?? null
-        });
+        const punt = await historico.findOne(
+          {
+            Producto,
+            Canal,
+            Ubicacion,
+            Fecha: { $gte: prevMon, $lt: prevSun },
+          },
+          { projection: { _id: 0, Cantidad: 1, Fecha: 1 } }
+        );
+        if (isDebugCombo)
+          dbg('puntual weekPrev:', {
+            prevMon: prevMon.toISOString(),
+            prevSun: prevSun.toISOString(),
+            found: !!punt,
+            Fecha: punt?.Fecha ? toUTC00(punt.Fecha).toISOString() : null,
+            Cantidad: punt?.Cantidad ?? null,
+          });
         if (punt && punt.Cantidad != null) {
           prevYear = Number(punt.Cantidad);
           if (isDebugCombo) dbg('prev_year by PUNTUAL =', prevYear);
@@ -398,24 +571,31 @@ async function bootstrapSession(db, {
       dbg('prev_year stays NULL for base:', Fecha.toISOString());
     }
 
-    const effectivePlan = (planVal != null ? planVal : baseVal);
+    const effectivePlan = planVal != null ? planVal : baseVal;
 
     ops.push({
       updateOne: {
         filter: { session_id, Producto, Canal, Ubicacion, Fecha },
         update: {
-          $setOnInsert: { session_id, Producto, Canal, Ubicacion, Fecha, comments: [] },
+          $setOnInsert: {
+            session_id,
+            Producto,
+            Canal,
+            Ubicacion,
+            Fecha,
+            comments: [],
+          },
           $set: {
             base_fcst: baseVal,
             plan_fcst: effectivePlan,
             actual,
             prev_year: prevYear,
             asertividad: computeAsertividad(actual, baseVal),
-            edited_at: new Date()
-          }
+            edited_at: new Date(),
+          },
         },
-        upsert: true
-      }
+        upsert: true,
+      },
     });
 
     combos.add(`${Producto}|${Canal}|${Ubicacion}`);
@@ -428,113 +608,219 @@ async function bootstrapSession(db, {
   }
 
   if (ops.length) await cells.bulkWrite(ops, { ordered: false });
-  await sessions.updateOne({ _id: session._id }, { $set: { updated_at: new Date() } });
+  await sessions.updateOne(
+    { _id: session._id },
+    { $set: { updated_at: new Date() } }
+  );
 
-  return { inserted: 'upserted', rows: baseRows.length, combos: combos.size, periods: periods.size };
+  return {
+    inserted: 'upserted',
+    rows: baseRows.length,
+    combos: combos.size,
+    periods: periods.size,
+  };
 }
 
 /* ========================== MATRIX ========================== */
 
-async function getMatrix(db, { session_id, page = 1, size = 200, filtros = {} }) {
+async function getMatrix(
+  db,
+  { session_id, page = 1, size = 200, filtros = {} }
+) {
   const q = { session_id };
   if (filtros.Producto) q.Producto = filtros.Producto;
   if (filtros.Canal) q.Canal = filtros.Canal;
   if (filtros.Ubicacion) q.Ubicacion = filtros.Ubicacion;
 
+  // 👇 Nuevo: si viene anchorDate, filtramos por Fecha >= anchorDate
+  if (filtros.anchorDate) {
+    const min = toDateSafe(filtros.anchorDate);
+    if (min) {
+      q.Fecha = { ...(q.Fecha || {}), $gte: min };
+    }
+  }
+
   const skip = Math.max(0, (page - 1) * (Number(size) || 200));
-  const cursor = db.collection('planner_cells')
+  const cursor = db
+    .collection("planner_cells")
     .find(q)
-    .sort({ Producto:1, Canal:1, Ubicacion:1, Fecha:1 })
+    .sort({ Producto: 1, Canal: 1, Ubicacion: 1, Fecha: 1 })
     .skip(skip)
     .limit(Number(size) || 200);
 
   const rows = await cursor.toArray();
-  const total = await db.collection('planner_cells').countDocuments(q);
-  return { rows, page:Number(page), size:Number(size), total };
+  const total = await db.collection("planner_cells").countDocuments(q);
+  return { rows, page: Number(page), size: Number(size), total };
 }
 
 /* ========================== EDICIÓN ========================== */
 
 async function upsertCell(db, payload) {
-  const { session_id, plan_fcst, comment, user } = payload;
-  const k = payload.cellKey || {};
-  const Producto  = payload.Producto  ?? k.Producto;
-  const Canal     = payload.Canal     ?? k.Canal;
-  const Ubicacion = payload.Ubicacion ?? k.Ubicacion;
-  const FechaIn   = payload.Fecha     ?? k.Fecha;
-
-  if (!Producto || !Canal || !Ubicacion || !FechaIn)
-    throw new Error('Missing Producto/Canal/Ubicacion/Fecha');
+  const { session_id, plan_fcst, comment, user, cellId } = payload;
 
   const cells = db.collection('planner_cells');
   const audit = db.collection('planner_audit');
 
-  const sess = await db.collection('planner_sessions').findOne({ session_id }, { projection: { 'source.freq':1 } });
-  const effFreq = String(sess?.source?.freq || 'M').toUpperCase();
-  const isWeekly = effFreq.startsWith('W');
+  let doc;
 
-  const fIn = toDateSafe(FechaIn);
-  if (!fIn) throw new Error('Invalid Fecha');
-  let rangeStart, rangeEnd;
-  if (isWeekly) {
-    const date = new Date(fIn.getFullYear(), fIn.getMonth(), fIn.getDate());
-    const day = date.getDay();
-    const diff = (day === 0 ? -6 : 1 - day);
-    date.setDate(date.getDate() + diff);
-    rangeStart = date;
-    rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate() + 7);
+  // 1) Ruta nueva: actualizar por _id (cellId)
+  if (cellId) {
+    try {
+      doc = await cells.findOne({
+        _id: new ObjectId(cellId),
+        session_id,
+      });
+    } catch (e) {
+      throw new Error('Invalid cellId');
+    }
   } else {
-    rangeStart = new Date(fIn.getFullYear(), fIn.getMonth(), 1);
-    rangeEnd = new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 1);
+    // 2) Ruta legacy: localizar por llave lógica + rango (semana/mes)
+    const k = payload.cellKey || {};
+    const Producto = payload.Producto ?? k.Producto;
+    const Canal = payload.Canal ?? k.Canal;
+    const Ubicacion = payload.Ubicacion ?? k.Ubicacion;
+    const FechaIn = payload.Fecha ?? k.Fecha;
+
+    if (!Producto || !Canal || !Ubicacion || !FechaIn)
+      throw new Error('Missing Producto/Canal/Ubicacion/Fecha');
+
+    const sess = await db
+      .collection('planner_sessions')
+      .findOne({ session_id }, { projection: { 'source.freq': 1 } });
+
+    const effFreq = String(sess?.source?.freq || 'M').toUpperCase();
+    const isWeekly = effFreq.startsWith('W');
+
+    const fIn = toDateSafe(FechaIn);
+    if (!fIn) throw new Error('Invalid Fecha');
+
+    let rangeStart, rangeEnd;
+    if (isWeekly) {
+      const date = new Date(fIn.getFullYear(), fIn.getMonth(), fIn.getDate());
+      const day = date.getDay(); // 0=Dom,1=Lun,...6=Sab
+      const diff = day === 0 ? -6 : 1 - day; // lunes ISO
+      date.setDate(date.getDate() + diff);
+      rangeStart = date;
+      rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate() + 7); // [Lun, Lun+7)
+    } else {
+      // mensual (o diaria) → bucket por mes
+      rangeStart = new Date(fIn.getFullYear(), fIn.getMonth(), 1);
+      rangeEnd = new Date(
+        rangeStart.getFullYear(),
+        rangeStart.getMonth() + 1,
+        1
+      );
+    }
+
+    doc = await cells.findOne({
+      session_id,
+      Producto,
+      Canal,
+      Ubicacion,
+      Fecha: { $gte: rangeStart, $lt: rangeEnd },
+    });
   }
 
-  const doc = await cells.findOne({ session_id, Producto, Canal, Ubicacion, Fecha:{ $gte:rangeStart, $lt:rangeEnd } });
   if (!doc) throw new Error('Cell not found');
 
-  const nextVal = Number(plan_fcst);
-  if (!isFinite(nextVal) || nextVal < 0) throw new Error('Invalid plan_fcst');
+  // 3) Construimos el update dinámicamente
+  const update = { $set: { edited_at: new Date() } };
   const before = { plan_fcst: doc.plan_fcst };
-  const update = { $set: { plan_fcst: nextVal, edited_at: new Date() } };
+
+  let nextVal = doc.plan_fcst;
+  let changedPlan = false;
+
+  // plan_fcst sólo si viene definido en el payload
+  if (plan_fcst !== undefined) {
+    if (plan_fcst === null) {
+      nextVal = null;
+    } else {
+      const n = Number(plan_fcst);
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error('Invalid plan_fcst');
+      }
+      nextVal = n;
+    }
+    update.$set.plan_fcst = nextVal;
+
+    const prevVal =
+      doc.plan_fcst === undefined ? null : Number(doc.plan_fcst);
+    changedPlan =
+      (prevVal ?? null) !== (nextVal ?? null) &&
+      !(prevVal == null && nextVal == null);
+  }
+
+  // comment opcional
+  let commentText = null;
   if (comment && String(comment).trim()) {
-    update.$push = { comments: { user, text: String(comment).slice(0,300), ts: new Date() } };
+    commentText = String(comment).slice(0, 300);
+    update.$push = {
+      comments: {
+        user,
+        text: commentText,
+        ts: new Date(),
+      },
+    };
   }
 
   await cells.updateOne({ _id: doc._id }, update);
+
+  // 4) Registrar en auditoría (aunque sólo sea comentario)
   await audit.insertOne({
     session_id,
-    cell: { Producto, Canal, Ubicacion, Fecha: doc.Fecha },
+    cell: {
+      _id: doc._id,
+      Producto: doc.Producto,
+      Canal: doc.Canal,
+      Ubicacion: doc.Ubicacion,
+      Fecha: doc.Fecha,
+    },
     user,
-    before,
-    after: { plan_fcst: nextVal },
-    comment: comment ? String(comment).slice(0,300) : null,
+    before: changedPlan ? before : null,
+    after: changedPlan ? { plan_fcst: nextVal } : null,
+    comment: commentText,
     action: 'UPSERT',
-    timestamp: new Date()
+    timestamp: new Date(),
   });
+
   return { ok: true };
 }
 
 /* ========================== BULK & PUBLISH ========================== */
 
 async function upsertCellsBulk(db, { session_id, ops = [], requestId }) {
-  let updated = 0; const errors = [];
-  for (let i=0; i<ops.length; i++) {
-    try { await upsertCell(db, { session_id, ...ops[i] }); updated++; }
-    catch (e) { errors.push({ index:i, error:e.message }); }
+  let updated = 0;
+  const errors = [];
+  for (let i = 0; i < ops.length; i++) {
+    try {
+      await upsertCell(db, { session_id, ...ops[i] });
+      updated++;
+    } catch (e) {
+      errors.push({ index: i, error: e.message });
+    }
   }
-  return { ok: errors.length===0, updated, errors, requestId };
+  return { ok: errors.length === 0, updated, errors, requestId };
 }
 
 async function publishSession(db, { session_id }) {
-  const session = await db.collection('planner_sessions').findOne({ session_id });
+  const session = await db
+    .collection('planner_sessions')
+    .findOne({ session_id });
   if (!session) throw new Error('Session not found');
 
   const now = new Date();
   const cur = db.collection('planner_cells').find({ session_id });
-  const histOps = [], actualOps = [];
+  const histOps = [],
+    actualOps = [];
 
   for await (const c of cur) {
-    const demandaPredicha = c.base_fcst == null ? null : Number(c.base_fcst);
-    const edited = (c.plan_fcst != null && c.base_fcst != null && Number(c.plan_fcst) !== Number(c.base_fcst));
+    const demandaPredicha =
+      c.base_fcst == null ? null : Number(c.base_fcst);
+    const edited =
+      c.plan_fcst != null &&
+      c.base_fcst != null &&
+      Number(c.plan_fcst) !== Number(c.base_fcst);
     const demandaPlaneada = edited ? Number(c.plan_fcst) : undefined;
 
     // demand_forecast (snapshot histórico)
@@ -546,7 +832,7 @@ async function publishSession(db, { session_id }) {
       'Demanda Predicha': demandaPredicha,
       forecast_date: now,
       scenario_id: session_id,
-      source: 'planner'
+      source: 'planner',
     };
     if (edited) snapDoc['Demanda Planeada'] = demandaPlaneada;
     histOps.push({ insertOne: { document: snapDoc } });
@@ -556,7 +842,7 @@ async function publishSession(db, { session_id }) {
       'Demanda Predicha': demandaPredicha,
       forecast_date: now,
       scenario_id: session_id,
-      source: 'planner'
+      source: 'planner',
     };
     const updateUnset = {};
     if (edited) {
@@ -569,26 +855,50 @@ async function publishSession(db, { session_id }) {
 
     actualOps.push({
       updateOne: {
-        filter: { Producto: c.Producto, Canal: c.Canal, Ubicacion: c.Ubicacion, Fecha: c.Fecha },
+        filter: {
+          Producto: c.Producto,
+          Canal: c.Canal,
+          Ubicacion: c.Ubicacion,
+          Fecha: c.Fecha,
+        },
         update: actualUpdate,
-        upsert: true
-      }
+        upsert: true,
+      },
     });
 
-    if (histOps.length >= 5000) { await db.collection('demand_forecast').bulkWrite(histOps, { ordered:false }); histOps.length = 0; }
-    if (actualOps.length >= 5000) { await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered:false }); actualOps.length = 0; }
+    if (histOps.length >= 5000) {
+      await db
+        .collection('demand_forecast')
+        .bulkWrite(histOps, { ordered: false });
+      histOps.length = 0;
+    }
+    if (actualOps.length >= 5000) {
+      await db
+        .collection('demand_forecast_actual')
+        .bulkWrite(actualOps, { ordered: false });
+      actualOps.length = 0;
+    }
   }
-  if (histOps.length) await db.collection('demand_forecast').bulkWrite(histOps, { ordered:false });
-  if (actualOps.length) await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered:false });
+  if (histOps.length)
+    await db
+      .collection('demand_forecast')
+      .bulkWrite(histOps, { ordered: false });
+  if (actualOps.length)
+    await db
+      .collection('demand_forecast_actual')
+      .bulkWrite(actualOps, { ordered: false });
 
- // Limpiar temporales de la sesión (planner_cells)
+  // Limpiar temporales de la sesión (planner_cells)
   await db.collection('planner_cells').deleteMany({ session_id });
 
   // Marcar sesión como CLOSED
   const closed_at = new Date();
   await db.collection('planner_sessions').updateOne(
     { _id: session._id },
-    { $set: { status: 'closed', updated_at: closed_at, closed_at }, $inc: { version: 1 } }
+    {
+      $set: { status: 'closed', updated_at: closed_at, closed_at },
+      $inc: { version: 1 },
+    }
   );
 
   return { published_at: now, closed_at };
@@ -597,17 +907,24 @@ async function publishSession(db, { session_id }) {
 async function saveSession(db, { session_id }) {
   // Igual que publishSession, pero SIN borrar planner_cells
   // y SIN cerrar la sesión.
-  const session = await db.collection('planner_sessions').findOne({ session_id });
+  const session = await db
+    .collection('planner_sessions')
+    .findOne({ session_id });
   if (!session) throw new Error('Session not found');
 
   const now = new Date();
   const cur = db.collection('planner_cells').find({ session_id });
 
-  const histOps = [], actualOps = [];
+  const histOps = [],
+    actualOps = [];
 
   for await (const c of cur) {
-    const demandaPredicha = c.base_fcst == null ? null : Number(c.base_fcst);
-    const edited = (c.plan_fcst != null && c.base_fcst != null && Number(c.plan_fcst) !== Number(c.base_fcst));
+    const demandaPredicha =
+      c.base_fcst == null ? null : Number(c.base_fcst);
+    const edited =
+      c.plan_fcst != null &&
+      c.base_fcst != null &&
+      Number(c.plan_fcst) !== Number(c.base_fcst);
     const demandaPlaneada = edited ? Number(c.plan_fcst) : undefined;
 
     // Snapshot histórico (NO cierra sesión)
@@ -619,7 +936,7 @@ async function saveSession(db, { session_id }) {
       'Demanda Predicha': demandaPredicha,
       forecast_date: now,
       scenario_id: session_id,
-      source: 'planner:save'
+      source: 'planner:save',
     };
     if (edited) snapDoc['Demanda Planeada'] = demandaPlaneada;
     histOps.push({ insertOne: { document: snapDoc } });
@@ -629,7 +946,7 @@ async function saveSession(db, { session_id }) {
       'Demanda Predicha': demandaPredicha,
       forecast_date: now,
       scenario_id: session_id,
-      source: 'planner:save'
+      source: 'planner:save',
     };
     const updateUnset = {};
     if (edited) {
@@ -642,18 +959,39 @@ async function saveSession(db, { session_id }) {
 
     actualOps.push({
       updateOne: {
-        filter: { Producto: c.Producto, Canal: c.Canal, Ubicacion: c.Ubicacion, Fecha: c.Fecha },
+        filter: {
+          Producto: c.Producto,
+          Canal: c.Canal,
+          Ubicacion: c.Ubicacion,
+          Fecha: c.Fecha,
+        },
         update: actualUpdate,
-        upsert: true
-      }
+        upsert: true,
+      },
     });
 
-    if (histOps.length >= 5000) { await db.collection('demand_forecast').bulkWrite(histOps, { ordered:false }); histOps.length = 0; }
-    if (actualOps.length >= 5000) { await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered:false }); actualOps.length = 0; }
+    if (histOps.length >= 5000) {
+      await db
+        .collection('demand_forecast')
+        .bulkWrite(histOps, { ordered: false });
+      histOps.length = 0;
+    }
+    if (actualOps.length >= 5000) {
+      await db
+        .collection('demand_forecast_actual')
+        .bulkWrite(actualOps, { ordered: false });
+      actualOps.length = 0;
+    }
   }
 
-  if (histOps.length)  await db.collection('demand_forecast').bulkWrite(histOps,  { ordered:false });
-  if (actualOps.length) await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered:false });
+  if (histOps.length)
+    await db
+      .collection('demand_forecast')
+      .bulkWrite(histOps, { ordered: false });
+  if (actualOps.length)
+    await db
+      .collection('demand_forecast_actual')
+      .bulkWrite(actualOps, { ordered: false });
 
   // Mantiene la sesión abierta; sólo actualiza updated_at
   await db.collection('planner_sessions').updateOne(
@@ -681,8 +1019,8 @@ async function addParticipant(db, { session_id, user }) {
     {
       $set: { updated_at: now },
       $addToSet: {
-        participants: { user, joined_at: now, last_seen: now }
-      }
+        participants: { user, joined_at: now, last_seen: now },
+      },
     }
   );
   if (!r.matchedCount) throw new Error('Session not found');
@@ -698,8 +1036,8 @@ async function heartbeatParticipant(db, { session_id, user }) {
     {
       $set: {
         updated_at: now,
-        'participants.$.last_seen': now
-      }
+        'participants.$.last_seen': now,
+      },
     }
   );
 
@@ -719,7 +1057,7 @@ async function removeParticipant(db, { session_id, user }) {
     { session_id },
     {
       $set: { updated_at: now },
-      $pull: { participants: { user } }
+      $pull: { participants: { user } },
     }
   );
   if (!r.matchedCount) throw new Error('Session not found');
@@ -729,7 +1067,10 @@ async function removeParticipant(db, { session_id, user }) {
 // Cierra si ya no hay participantes (llama publishSession y marca closed)
 async function autoCloseIfEmpty(db, { session_id }) {
   const sessions = db.collection('planner_sessions');
-  const s = await sessions.findOne({ session_id }, { projection: { _id:1, participants:1, status:1 } });
+  const s = await sessions.findOne(
+    { session_id },
+    { projection: { _id: 1, participants: 1, status: 1 } }
+  );
   if (!s) throw new Error('Session not found');
   if (s.status === 'closed') return { alreadyClosed: true };
 
@@ -742,7 +1083,10 @@ async function autoCloseIfEmpty(db, { session_id }) {
 }
 
 // Cierra sesion en caso de que usuarios estan inactivos
-async function cleanupInactiveParticipants(db, { session_id, graceSeconds = 90 }) {
+async function cleanupInactiveParticipants(
+  db,
+  { session_id, graceSeconds = 90 }
+) {
   const sessions = db.collection('planner_sessions');
   const now = new Date();
   const cutoff = new Date(now.getTime() - graceSeconds * 1000);
@@ -763,7 +1107,8 @@ async function cleanupInactiveParticipants(db, { session_id, graceSeconds = 90 }
 
 // Lista sesiones abiertas (solo id para barrido)
 async function listOpenSessions(db) {
-  return db.collection('planner_sessions')
+  return db
+    .collection('planner_sessions')
     .find({ status: { $ne: 'closed' } }, { projection: { _id: 0, session_id: 1 } })
     .toArray();
 }
@@ -773,12 +1118,32 @@ async function cleanupAllOpenSessions(db, { graceSeconds = 90 } = {}) {
   const open = await listOpenSessions(db);
   const results = [];
   for (const s of open) {
-    const out = await cleanupInactiveParticipants(db, { session_id: s.session_id, graceSeconds });
+    const out = await cleanupInactiveParticipants(db, {
+      session_id: s.session_id,
+      graceSeconds,
+    });
     results.push({ session_id: s.session_id, ...out });
   }
   return results;
 }
 
+//--------------------FILTROS--------------------------
+
+async function getFilterOptions(db, { session_id }) {
+  const cells = db.collection('planner_cells');
+
+  const [productos, canales, ubicaciones] = await Promise.all([
+    cells.distinct('Producto', { session_id }),
+    cells.distinct('Canal', { session_id }),
+    cells.distinct('Ubicacion', { session_id }),
+  ]);
+
+  return {
+    Producto: productos.filter(Boolean).sort(),
+    Canal: canales.filter(Boolean).sort(),
+    Ubicacion: ubicaciones.filter(Boolean).sort(),
+  };
+}
 
 module.exports = {
   openOrGetActiveSession,
@@ -794,5 +1159,6 @@ module.exports = {
   autoCloseIfEmpty,
   cleanupInactiveParticipants,
   listOpenSessions,
-  cleanupAllOpenSessions
+  cleanupAllOpenSessions,
+  getFilterOptions,
 };

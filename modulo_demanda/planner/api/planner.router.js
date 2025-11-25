@@ -13,6 +13,7 @@ const {
   autoCloseIfEmpty,
   cleanupInactiveParticipants,
   cleanupAllOpenSessions,
+  getFilterOptions,
 } = require("./planner.service");
 
 function plannerRouter() {
@@ -86,54 +87,124 @@ r.post("/session/open", async (req, res) => {
   });
 
   // Matrix
-  r.get("/:sessionId/matrix", async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const { page = 1, size = 200, Producto, Canal, Ubicacion } = req.query;
-      const out = await getMatrix(req.db, {
-        session_id: sessionId,
-        page: Number(page),
-        size: Number(size),
-        filtros: { Producto, Canal, Ubicacion },
-      });
-      res.json(out);
-    } catch (e) {
-      console.error("Error /:sessionId/matrix:", e);
-      res.status(500).json({ error: e.message });
-    }
-  });
+// Matrix
+r.get("/:sessionId/matrix", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const {
+      page = 1,
+      size = 200,
+      Producto,
+      Canal,
+      Ubicacion,
+      anchorDate,          // 👈 nuevo
+    } = req.query;
+
+    console.log("[planner] GET matrix", {
+      sessionId,
+      page,
+      size,
+      Producto,
+      Canal,
+      Ubicacion,
+      anchorDate,
+    });
+
+    const out = await getMatrix(req.db, {
+      session_id: sessionId,
+      page: Number(page),
+      size: Number(size),
+      filtros: {
+        Producto,
+        Canal,
+        Ubicacion,
+        anchorDate,       // 👈 lo pasamos como parte de filtros
+      },
+    });
+    res.json(out);
+  } catch (e) {
+    console.error("Error /:sessionId/matrix:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
   // Upsert cell (editar plan_fcst y comentar) — soporta payload plano o con cellKey
   r.put("/:sessionId/cell", async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const out = await upsertCell(req.db, {
-        session_id: sessionId,
-        ...req.body, // {Producto,Canal,Ubicacion,Fecha,plan_fcst,comment,user,version} o {cellKey:{...},...}
-      });
-      res.json(out);
-    } catch (e) {
-      console.error("Error /:sessionId/cell:", e);
-      res.status(500).json({ error: e.message });
+  try {
+    const { sessionId } = req.params;
+
+    const out = await upsertCell(req.db, {
+      session_id: sessionId,
+      ...req.body,
+    });
+
+    // Emitir evento en tiempo real al room de esa sesión
+    const io = req.app.get("io");
+    if (io) {
+      // Idealmente `out` ya es el documento actualizado.
+      const doc = out && out.fullDocument ? out.fullDocument : out;
+
+      if (doc) {
+        io.to(`planner:${sessionId}`).emit("cellUpdated", {
+          Producto: doc.Producto,
+          Canal: doc.Canal,
+          Ubicacion: doc.Ubicacion,
+          Fecha: doc.Fecha,
+          plan_fcst: doc.plan_fcst,
+          base_fcst: doc.base_fcst,
+          actual: doc.actual,
+          prev_year: doc.prev_year,
+          asertividad: doc.asertividad,
+          hasComments:
+            Array.isArray(doc.comments) && doc.comments.length > 0,
+        });
+      }
     }
-  });
+
+    res.json(out);
+  } catch (e) {
+    console.error("Error /:sessionId/cell:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
   // Upsert bulk
-  r.patch("/:sessionId/cells/bulk", async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const { ops = [], requestId } = req.body || {};
-      const out = await upsertCellsBulk(req.db, {
-        session_id: sessionId,
-        ops,
-        requestId,
-      });
-      res.json(out);
-    } catch (e) {
-      console.error("Error /:sessionId/cells/bulk:", e);
-      res.status(500).json({ error: e.message });
+ r.patch("/:sessionId/cells/bulk", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { ops = [], requestId } = req.body || {};
+
+    const out = await upsertCellsBulk(req.db, {
+      session_id: sessionId,
+      ops,
+      requestId,
+    });
+
+    const io = req.app.get("io");
+    if (io && Array.isArray(out?.docs)) {
+      for (const doc of out.docs) {
+        io.to(`planner:${sessionId}`).emit("cellUpdated", {
+          Producto: doc.Producto,
+          Canal: doc.Canal,
+          Ubicacion: doc.Ubicacion,
+          Fecha: doc.Fecha,
+          plan_fcst: doc.plan_fcst,
+          base_fcst: doc.base_fcst,
+          actual: doc.actual,
+          prev_year: doc.prev_year,
+          asertividad: doc.asertividad,
+          hasComments:
+            Array.isArray(doc.comments) && doc.comments.length > 0,
+        });
+      }
     }
-  });
+
+    res.json(out);
+  } catch (e) {
+    console.error("Error /:sessionId/cells/bulk:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
 
   // Guardar sin cerrar
   r.post("/:sessionId/save", async (req, res) => {
@@ -224,6 +295,17 @@ r.post('/:sessionId/participants/cleanup', async (req, res) => {
     res.json(out);
   } catch (e) {
     console.error('Error /:sessionId/participants/cleanup:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+r.get("/:sessionId/filters", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const out = await getFilterOptions(req.db, { session_id: sessionId });
+    res.json(out);
+  } catch (e) {
+    console.error("Error /:sessionId/filters:", e);
     res.status(500).json({ error: e.message });
   }
 });
