@@ -11,6 +11,7 @@ async function getDb(appUser, dbName) {
   if (clientCache.has(key)) return clientCache.get(key).db;
 
   // Carga credenciales del usuario (igual que tus scripts)
+//const configPath = path.join(__dirname, `../../../../${dbName}/cfg/${appUser}.dbvars.js`);
 const configPath = path.join(__dirname, `../../../../${appUser}/cfg/dbvars`);
 const { DBUser, DBPassword } = require(configPath);
   const decryptedPassword = await decryptData(DBPassword);

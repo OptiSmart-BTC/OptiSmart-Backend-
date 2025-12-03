@@ -4,7 +4,12 @@ const { ObjectId } = require('mongodb');
 /* ========================== DEBUG ========================== */
 // Activa/desactiva logs de YoY
 const DEBUG_YOY = false;
-
+// Limita el ruido a un combo específico (ajústalo a lo que estés probando)
+const DEBUG_FILTER = {
+  Producto: 'BMX_1727',
+  Canal: 'BMX_AUTOSERVICIOS',
+  Ubicacion: 'BMX_3001',
+};
 function sameCombo(a, b) {
   return (
     a.Producto === b.Producto &&
@@ -153,6 +158,7 @@ async function openOrGetActiveSession(
 async function bootstrapSession(db, {
   session_id,
   appUser,
+  //dbName,
   fromDate,
   toDate,
   anchorDate,
@@ -178,6 +184,7 @@ async function bootstrapSession(db, {
     console.log('[planner] bootstrap IN', {
       session_id,
       appUser,
+      dbName,
       yoyMode,
       fromDate,
       toDate,
@@ -353,6 +360,7 @@ async function bootstrapSession(db, {
     return { inserted: 0, rows: 0, combos: 0, periods: 0 };
   }
 
+  //const historico = db.collection(`historico_demanda_${dbName}`);
   const historico = db.collection(`historico_demanda_${appUser}`);
   const comboSet = new Set(
     baseRows.map((r) => `${r.Producto}|${r.Canal}|${r.Ubicacion}`)
