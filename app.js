@@ -9,18 +9,25 @@ const path = require('path');
 const moment = require('moment-timezone');
 const archiver = require('archiver'); 
 const { Parser } = require('json2csv');
-const logger = require('./logger'); // Importa la configuración de winston
+const logger = require('./logger');
 const axios = require('axios');
 const cors = require('cors');
 const { ObjectId } = require("mongodb"); 
 require('dotenv').config();
 
-const conex= require('./Configuraciones/ConStrDB');
+const conex = require('./Configuraciones/ConStrDB');
 const { decryptData } = require('./DeCriptaPassAppDb');
-//const { host, puerto, useradmin, passadmin } = require('./Configuraciones/ConexionDB');
+
 const app = express();
-app.use(cors());
-const port = 3000;
+
+// ===== CONFIGURACIÓN CORS =====
+app.use(cors({
+  origin: ['https://optiscportal.com', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}));
+
+// ===== PUERTO 443 (HTTPS ESTÁNDAR) =====
+const port = 443; // Puerto estándar HTTPS (sin necesidad de especificar :443)
 
 const directorioActual = __dirname;
 const rutaDirConfiguraCliente = path.join(directorioActual, 'ConfiguraCliente');
@@ -65,19 +72,18 @@ const rutaDirMontecarlo = path.join(
 const adminDbName = 'OptiBTC';
 const usersCollectionName = 'usuarios';
 
-//let userDbName = ''; 
-//let userLogged = ''; 
-// Configurar EJS como motor de plantillas
-//app.set('view engine', 'ejs');
-app.use(express.static(__dirname));
-// Middleware para procesar el cuerpo de las solicitudes
+// ===== MIDDLEWARE PARA SERVIR ARCHIVOS ESTÁTICOS =====
+// Esto es importante para servir tu frontend de React/Vite después del build
+app.use(express.static(path.join(__dirname, 'dist'))); // Para producción (npm run build)
+// Si tienes los archivos en otra carpeta, ajusta esta ruta
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json()); 
 
 // Middleware para el manejo de archivos
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, './uploads'); // Carpeta donde se guardarán los archivos cargados
+    cb(null, './uploads');
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
@@ -86,9 +92,29 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Ruta para mostrar la página de inicio de sesión
+// ===== NOTA IMPORTANTE SOBRE index.html =====
+// Este archivo debería estar en la carpeta 'dist' después de hacer build del frontend
+// O puedes especificar otra ruta donde tengas tu archivo HTML principal
+
+// Ruta para servir el frontend (React/Vite)
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).send(`
+      <h1> Error: No se encontró index.html</h1>
+      <p>El archivo debería estar en: ${indexPath}</p>
+      <p><strong>Solución:</strong></p>
+      <ol>
+        <li>Ve a tu carpeta del frontend</li>
+        <li>Ejecuta: <code>npm run build</code></li>
+        <li>Copia la carpeta 'dist' generada a la carpeta del backend (${__dirname})</li>
+      </ol>
+      <p>O actualiza la ruta en app.js línea 75 si tu index.html está en otra ubicación.</p>
+    `);
+  }
 });
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -3254,27 +3280,6 @@ app.post("/api/create-user", (req, res) => {
 
 
 
-// Iniciar el servidor
-const http = require('http');
-
-// Elimina todas las referencias a SSL y HTTPS
-// const https = require('https');
-// const fs = require('fs');
-
-// Elimina también las opciones de SSL
-// var options = {
-//  key: fs.readFileSync('C:\\SSLcert\\optiscportal.com_key.txt'),
-//  cert: fs.readFileSync('C:\\SSLcert\\optiscportal.com.crt'),
-//  ca: fs.readFileSync ('C:\\SSLcert\\optiscportal.com.ca-bundle')
-// };
-
-// Si tienes el app.js importado o declarado en otro lugar, simplemente usa `app` aquí
-// Si no, asegúrate de tener la instancia de Express disponible.
-// Suponiendo que `app` ya está definido en otro archivo:
-http.createServer(app).listen(3000, () => {
-  console.log('Servidor HTTP iniciado en http://localhost:3000');
-});
-
 
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -3944,7 +3949,7 @@ app.get('/logs', async (req, res) => {
 
 
 // Endpoint siguiendo el patrón de los endpoints que funcionan
-app.post('/getPoliticasGuardadas', async (req, res) => {
+/*app.post('/getPoliticasGuardadas', async (req, res) => {
 
   let client;
 
@@ -4020,7 +4025,7 @@ app.post('/getPoliticasGuardadas', async (req, res) => {
       client.close();
     }
   }
-});
+});*/
 
 // FUNCIÓN PARA LIMPIAR OBJETOS PROBLEMÁTICOS
 function cleanObjectForJson(obj) {
@@ -4063,7 +4068,7 @@ function cleanObjectForJson(obj) {
   return obj;
 }
 
-app.post('/runUsoPoliticaGuardada', async (req, res) => {
+/*app.post('/runUsoPoliticaGuardada', async (req, res) => {
   try {
     const { appUser, appPass, DBName, idPolitica, modoUso, comentario } = req.body;
 
@@ -4101,7 +4106,7 @@ app.post('/runUsoPoliticaGuardada', async (req, res) => {
     console.error('[runUsoPoliticaGuardada] Error general:', err);
     res.status(500).send('Error interno al procesar uso de política guardada');
   }
-});
+});*/
 
 app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
   try {
@@ -4112,10 +4117,10 @@ app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
     await conex.connectToDatabase();
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
 
-    const client = conex.getClient(); // ✅ obtenemos el cliente
-    const db = client.db('btc_opti_' + DBName); // ✅ obtenemos la instancia correcta de la base de datos
+    const client = conex.getClient(); // 
+    const db = client.db('btc_opti_' + DBName); // 
 
-    const colecciones = ['ubis_saved', 'politica_inventarios_01'];
+    const colecciones = ['ubis_saved', 'politica_inventarios_01','ui_all_pol_inv','cambios_ubicaciones_temp', 'politica_inventarios_01_sem','ui_sem_all_pol_inv','cambios_ubicaciones_temp_sem'];
     const resultados = [];
 
     for (const nombre of colecciones) {
@@ -4141,9 +4146,13 @@ app.post('/deleteColeccionesUbisYPolitica', async (req, res) => {
 
 
 
+
 app.post('/runCambiosIncrementales', async (req, res) => {
   try {
     const { appUser, appPass, DBName } = req.body;
+    
+    console.log(" Recibida petición - Usuario:", appUser, "DB:", DBName);
+    
     const decryptedAppPass = await getDecryptedPassUser(appPass);
 
     // Configurar datos de conexión
@@ -4151,23 +4160,191 @@ app.post('/runCambiosIncrementales', async (req, res) => {
     conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
     const usuarioLog = conex.getUser();
 
-    console.log("Ejecutando proceso incremental (P23 + P24) para usuario:", usuarioLog);
+    console.log(" INICIO - Ejecutando proceso incremental (P23 + P24) para usuario:", usuarioLog);
+    console.log(" Directorio de trabajo:", rutaDirClasifABCD);
 
     // Comando para ejecutar el nuevo script incremental
     const comandoIncremental = `cd /d "${rutaDirClasifABCD}" && node Ejecuta_CambiosIncrementales.js ${usuarioLog}`;
+    
+    console.log(" Comando a ejecutar:", comandoIncremental);
+    console.log(" ESPERANDO - Iniciando ejecución del comando...");
 
-    exec(comandoIncremental, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Incremental - Error al ejecutar:', error);
-        return res.status(500).send('Error al ejecutar proceso incremental');
-      }
+    const startTime = Date.now();
 
-      console.log('Incremental - Proceso ejecutado con éxito');
-      res.status(200).send('Proceso incremental ejecutado correctamente');
-    });
+    //  USAR execSync en lugar de exec con await
+    try {
+      const resultado = execSync(comandoIncremental, {
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10,
+        stdio: 'pipe' // Captura stdout y stderr
+      });
+
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      
+      console.log(` Tiempo de ejecución: ${duration} segundos`);
+      console.log(' Incremental - stdout:', resultado);
+      console.log(' Incremental - Proceso ejecutado con éxito');
+      console.log(" PROCESO TERMINADO - Enviando respuesta al frontend");
+
+      res.status(200).json({ 
+        success: true,
+        message: 'Proceso incremental ejecutado correctamente',
+        output: resultado,
+        duration: duration
+      });
+
+    } catch (execError) {
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      
+      console.error(' Error al ejecutar comando:', execError.message);
+      console.error(' stdout:', execError.stdout?.toString());
+      console.error(' stderr:', execError.stderr?.toString());
+      console.error(` Tiempo antes del error: ${duration} segundos`);
+      
+      throw execError;
+    }
 
   } catch (err) {
-    console.error('Incremental - Error general:', err);
-    res.status(500).send('Error en el proceso incremental');
+    console.error(' Incremental - Error general:', err.message);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error en el proceso incremental: ' + err.message 
+    });
   }
 });
+
+app.post('/runCambiosIncrementales_Sem', async (req, res) => {
+  try {
+    const { appUser, appPass, DBName } = req.body;
+    
+    console.log(" Recibida petición SEMANAL - Usuario:", appUser, "DB:", DBName);
+    
+    const decryptedAppPass = await getDecryptedPassUser(appPass);
+
+    // Configurar datos de conexión
+    await conex.connectToDatabase();
+    conex.setUserData(appUser, decryptedAppPass, 'btc_opti_' + DBName);
+    const usuarioLog = conex.getUser();
+
+    console.log(" INICIO - Ejecutando proceso incremental SEMANAL (P23 + P24) para usuario:", usuarioLog);
+    console.log(" Directorio de trabajo:", rutaDirClasifABCDSem);
+
+    // Comando para ejecutar el nuevo script incremental
+    const comandoIncremental = `cd /d "${rutaDirClasifABCDSem}" && node Ejecuta_CambiosIncrementales_Sem.js ${usuarioLog}`;
+    
+    console.log(" Comando a ejecutar:", comandoIncremental);
+    console.log(" ESPERANDO - Iniciando ejecución del comando...");
+
+    const startTime = Date.now();
+
+    //  USAR execSync en lugar de exec con await
+    try {
+      const resultado = execSync(comandoIncremental, {
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10,
+        stdio: 'pipe' // Captura stdout y stderr
+      });
+
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      
+      console.log(` Tiempo de ejecución: ${duration} segundos`);
+      console.log(' Incremental Sem - stdout:', resultado);
+      console.log(' Incremental Sem - Proceso ejecutado con éxito');
+      console.log(" PROCESO SEMANAL TERMINADO - Enviando respuesta al frontend");
+
+      res.status(200).json({ 
+        success: true,
+        message: 'Proceso incremental semanal ejecutado correctamente',
+        output: resultado,
+        duration: duration
+      });
+
+    } catch (execError) {
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(2);
+      
+      console.error(' Error al ejecutar comando:', execError.message);
+      console.error(' stdout:', execError.stdout?.toString());
+      console.error(' stderr:', execError.stderr?.toString());
+      console.error(` Tiempo antes del error: ${duration} segundos`);
+      
+      throw execError;
+    }
+
+  } catch (err) {
+    console.error(' Incremental Sem - Error general:', err.message);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error en el proceso incremental semanal: ' + err.message 
+    });
+  }
+});
+
+//===== RUTA CATCH-ALL (debe ir al final) =====
+// Esto maneja todas las rutas del frontend (React Router)
+app.get('*', (req, res) => {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ error: 'Página no encontrada' });
+  }
+});
+
+// ===== CONFIGURACIÓN HTTPS =====
+const https = require('https');
+
+const options = {
+  key: fs.readFileSync('C:\\SSLcert\\optiscportal.com_key.txt'),
+  cert: fs.readFileSync('C:\\SSLcert\\optiscportal.com.crt'),
+  ca: fs.readFileSync('C:\\SSLcert\\optiscportal.com.ca-bundle')
+};
+
+// ===== INICIAR SERVIDOR HTTPS EN PUERTO 443 =====
+https.createServer(options, app).listen(port, () => {
+  //console.log('='.repeat(60));
+  console.log(' SERVIDOR HTTPS INICIADO CORRECTAMENTE');
+  //console.log('='.repeat(60));
+  console.log(` URL: https://optiscportal.com`);
+  console.log(` Puerto: ${port}`);
+  //console.log(` Sirviendo archivos desde: ${path.join(__dirname, 'dist')}`);
+  //console.log('='.repeat(60));
+  //console.log(' Recuerda actualizar el .env del frontend:');
+  //console.log('   VITE_API_URL=https://optiscportal.com');
+  //console.log('='.repeat(60));
+});
+
+// ===== OPCIONAL: Servidor HTTP que redirige a HTTPS =====
+// Descomenta esto si quieres redirigir automáticamente HTTP a HTTPS
+/*
+const http = require('http');
+http.createServer((req, res) => {
+  res.writeHead(301, { Location: `https://${req.headers.host}${req.url}` });
+  res.end();
+}).listen(80, () => {
+  console.log(' Servidor HTTP (puerto 80) redirigiendo a HTTPS');
+});
+*/
+
+
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+// Obtener el valor desencriptado del User
+async function getDecryptedPassUser(p_AppPass) {
+  try {
+    return await decryptData(p_AppPass);
+  } catch (error) {
+    console.error('Error al desencriptar el User:', error);
+    throw error;
+  }
+}

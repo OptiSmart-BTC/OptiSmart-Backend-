@@ -22,7 +22,7 @@ function writeToLog(message) {
 }
 
 async function calcularDemandaIndirecta() {
-  writeToLog(`\nPaso Extra - Cálculo de Demanda Indirecta por Nivel ${nivelFiltrado}`);
+  writeToLog(`\nPaso Extra - Cálculo de Demanda Indirecta para Nivel ${nivelFiltrado}`);
   let client;
 
   try {
@@ -51,19 +51,25 @@ async function calcularDemandaIndirecta() {
     const updates = [];
     let contadorConDemanda = 0;
 
+    // Filtrar SOLO los documentos del nivel que estamos calculando
     const docsFiltrados = docsConCodigo.filter(d => d.Nivel_OA === nivelFiltrado);
 
+    writeToLog(`\t Documentos en Nivel ${nivelFiltrado}: ${docsFiltrados.length}`);
+
     for (const doc of docsFiltrados) {
+      //  CORRECCIÓN: Buscar CUALQUIER ubicación que tenga como origen a esta ubicación
       const abastecidos = docsConCodigo.filter(d =>
         d.Codigo_Producto === doc.Codigo_Producto &&
         d.Origen_Abasto === doc.Ubicacion &&
-        d.Nivel_OA === (nivelFiltrado - 1) &&
         (d.Plan_Reposicion_Cantidad || 0) > 0
       );
 
       const demanda = abastecidos.reduce((sum, d) => sum + (d.Plan_Reposicion_Cantidad || 0), 0);
 
-      if (demanda > 0) contadorConDemanda++;
+      if (demanda > 0) {
+        contadorConDemanda++;
+        writeToLog(`\t\t ${doc.SKU} (Nivel ${doc.Nivel_OA}) abastece a ${abastecidos.length} SKUs → Demanda: ${demanda}`);
+      }
 
       updates.push({
         updateOne: {
@@ -77,10 +83,10 @@ async function calcularDemandaIndirecta() {
       await planRepCol.bulkWrite(updates);
     }
 
-    writeToLog(`\t Demanda Indirecta actualizada para nivel ${nivelFiltrado} (${updates.length} docs)`);
+    writeToLog(`\t  Demanda Indirecta actualizada para nivel ${nivelFiltrado} (${updates.length} docs)`);
     writeToLog(`\t Total con Demanda > 0: ${contadorConDemanda}`);
   } catch (error) {
-    writeToLog(`${now} - [ERROR] ${error.message}`);
+    writeToLog(`${now} -  ERROR: ${error.message}`);
     console.error(' Error en Calculo_Demanda_Indirecta:', error.message);
   } finally {
     if (client) client.close();

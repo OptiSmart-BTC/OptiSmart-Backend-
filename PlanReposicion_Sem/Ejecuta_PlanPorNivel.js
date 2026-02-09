@@ -3,7 +3,7 @@ const fs = require('fs');
 const moment = require('moment');
 const { decryptData } = require('./DeCriptaPassAppDb');
 
-const parametroUsuario = process.argv[2];
+const parametroUsuario = process.argv.slice(2)[0];
 const { GB_DBName } = require(`../Configuraciones/dbUsers/${parametroUsuario}.dbnamevar.js`);
 const parametroFolder = GB_DBName.toUpperCase();
 const { DBUser, DBPassword, DBName } = require(`../../${parametroFolder}/cfg/dbvars`);
@@ -30,7 +30,7 @@ async function ejecutarPlanPorNivel() {
   writeToLog(`\nProceso de Ejecución de Plan de Reposición por Nivel`);
   writeToLog(`Inicio de ejecución: ${moment().format('YYYY-MM-DD HH:mm:ss')}\n`);
 
-  // 🟢 Paso 0: Copiar Nivel_OA y Origen_Abasto antes de TODO
+  //  Paso 0: Copiar Nivel_OA y Origen_Abasto antes de TODO
   await ejecutarYLog(`node Copia_NivelOA.js ${dbName} ${DBUser} ${passadminDeCripta}`);
 
   //  Paso 1: Niveles 0 y 1 (cálculo directo)

@@ -38,36 +38,64 @@ async function main() {
 
     await client.connect();
     const db = client.db(dbName);
-
     const ColeccionComparada = db.collection('inventario_transito');
     const ColeccionRespaldo = db.collection('report_sin_sku_invtrans_vs_polinv');
 
-    // Primero validamos contra politica_inventarios_01
-    let skuDocs = await db.collection('politica_inventarios_01').find({}).toArray();
-    let skus = skuDocs.map((doc) => doc.SKU);
+    // Verificar ambas políticas para determinar cuál usar
+    const politicaDiariaCount = await db.collection('politica_inventarios_01').countDocuments();
+    const politicaSemanalCount = await db.collection('politica_inventarios_01_sem').countDocuments();
+    
+    writeToLog(`\tPolitica diaria tiene ${politicaDiariaCount} registros.`);
+    writeToLog(`\tPolitica semanal tiene ${politicaSemanalCount} registros.`);
 
-    let skusNoEncontrados = await ColeccionComparada.find({ SKU: { $nin: skus } }).toArray();
+    let skus = [];
+    let politicaUsada = '';
 
-    // Si encontró registros que no están en politica_inventarios_01, reintenta contra politica_inventarios_01_sem
-    if (skusNoEncontrados.length > 0 && skuDocs.length > 0) {
-      writeToLog(`\tValidando también contra politica_inventarios_01_sem...`);
-      skuDocs = await db.collection('politica_inventarios_01_sem').find({}).toArray();
+    // Decidir qué política usar basado en la cantidad de SKUs
+    if (politicaSemanalCount > politicaDiariaCount) {
+      // La semanal tiene más registros, probablemente más actualizada
+      const skuDocs = await db.collection('politica_inventarios_01_sem').find({}).toArray();
       skus = skuDocs.map((doc) => doc.SKU);
-
-      // Vuelve a validar pero solo los que no encontró antes
-      const idsNoEncontradosAntes = skusNoEncontrados.map((doc) => doc._id);
-      skusNoEncontrados = await ColeccionComparada.find({
-        _id: { $in: idsNoEncontradosAntes },
-        SKU: { $nin: skus }
-      }).toArray();
+      politicaUsada = 'politica_inventarios_01_sem (Semanal)';
+      writeToLog(`\tUsando politica semanal porque tiene mas SKUs (${politicaSemanalCount} vs ${politicaDiariaCount}).`);
+    } else if (politicaDiariaCount > 0) {
+      // La diaria tiene datos y es mayor o igual a la semanal
+      const skuDocs = await db.collection('politica_inventarios_01').find({}).toArray();
+      skus = skuDocs.map((doc) => doc.SKU);
+      politicaUsada = 'politica_inventarios_01 (Diaria)';
+      writeToLog(`\tUsando politica diaria porque tiene ${politicaDiariaCount} SKUs (>= semanal: ${politicaSemanalCount}).`);
+    } else if (politicaSemanalCount > 0) {
+      // La diaria está vacía, usar la semanal como respaldo
+      const skuDocs = await db.collection('politica_inventarios_01_sem').find({}).toArray();
+      skus = skuDocs.map((doc) => doc.SKU);
+      politicaUsada = 'politica_inventarios_01_sem (Semanal - Respaldo)';
+      writeToLog(`\tPolitica diaria vacia. Usando semanal como respaldo con ${politicaSemanalCount} SKUs.`);
     }
 
-    if (skusNoEncontrados.length === 0) {
-      writeToLog(`\tIntegridad de SKUs correcta.`);
+    // Verificar que al menos una política tenga datos
+    if (skus.length === 0) {
+      writeToLog(`\tERROR: Ambas politicas estan vacias. No se puede validar integridad.`);
       return;
     }
 
-    // Registros no encontrados
+    // Buscar SKUs que NO están en la política seleccionada
+    const skusNoEncontrados = await ColeccionComparada.find({ SKU: { $nin: skus } }).toArray();
+
+    writeToLog(`\tPolitica usada: ${politicaUsada}`);
+    writeToLog(`\tSKUs en politica: ${skus.length}`);
+    writeToLog(`\tRegistros en inventario transito: ${await ColeccionComparada.countDocuments()}`);
+    writeToLog(`\tSKUs sin coincidencia: ${skusNoEncontrados.length}`);
+
+    if (skusNoEncontrados.length === 0) {
+      writeToLog(`\tIntegridad de SKUs correcta. Todos los SKUs del inventario transito coinciden con la politica.`);
+      return;
+    }
+
+    // Mostrar algunos ejemplos de SKUs no encontrados para debug
+    const ejemplosNoEncontrados = skusNoEncontrados.slice(0, 5).map(doc => doc.SKU);
+    writeToLog(`\tEjemplos de SKUs no encontrados: ${ejemplosNoEncontrados.join(', ')}`);
+
+    // Generar CSV y respaldo
     const registrosFormateados = skusNoEncontrados.map((registro) => ({
       SKU: registro.SKU,
       Ubicacion: registro.Ubicacion,
@@ -92,8 +120,10 @@ async function main() {
     const skusNoEncontradosIds = skusNoEncontrados.map((registro) => registro._id);
     await ColeccionComparada.deleteMany({ _id: { $in: skusNoEncontradosIds } });
 
-    writeToLog(`\tSe encontraron ${skusNoEncontradosIds.length} registros sin coincidencia en ninguna política.`);
-    writeToLog(`\tSe eliminan dichos registros para evitar errores en los calculos`);
+    writeToLog(`\tSe encontraron ${skusNoEncontradosIds.length} registros en el Inventario Transito sin coincidencia en ${politicaUsada}.`);
+    writeToLog(`\tSe eliminaron dichos registros para evitar errores en los calculos.`);
+    writeToLog(`\tCSV generado: ${csvPath}`);
+
   } catch (error) {
     writeToLog(`${now} - Error: ${error}`);
   } finally {

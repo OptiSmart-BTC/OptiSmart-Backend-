@@ -1,5 +1,7 @@
 // Importación de módulos necesarios
 const fs = require('fs');
+const path = require('path');
+
 const { MongoClient } = require('mongodb');
 const conex = require('../Configuraciones/ConStrDB');
 const moment = require('moment');
@@ -137,7 +139,53 @@ async function calculateAndStoreStdev() {
 
 // Función para registrar en log
 function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
+  const moment = require('moment');
+  const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+  const logMessage = `[${timestamp}] ${message}`;
+  
+  try {
+    // Lógica mejorada para determinar el directorio de log
+    let parametroFolder;
+    try {
+      if (typeof dbName !== 'undefined' && dbName) {
+        const partes = dbName.split("_");
+        let parte = partes[partes.length - 1];
+        
+        // Si la última parte parece un timestamp (12+ dígitos), usar la anterior
+        if (/^\d{12,}$/.test(parte)) {
+          parte = partes[partes.length - 2];
+        }
+        
+        parametroFolder = parte.toUpperCase();
+      } else {
+        parametroFolder = 'DEFAULT';
+      }
+    } catch (error) {
+      parametroFolder = 'DEFAULT';
+    }
+    
+    const logFile = path.resolve(__dirname, `../../${parametroFolder}/log/ClasABCD_PolInvent.log`);
+    const logDir = path.dirname(logFile);
+    
+    // Crear directorio si no existe
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    // Escribir al archivo de log
+    fs.appendFileSync(logFile, logMessage + '\n');
+  } catch (err) {
+    // Fallback: escribir en directorio actual si hay problemas
+    try {
+      const fallbackLogFile = path.join(__dirname, `${path.basename(__filename, '.js')}_fallback.log`);
+      fs.appendFileSync(fallbackLogFile, logMessage + '\n');
+      console.error(`Log escrito en fallback: ${fallbackLogFile}`);
+    } catch (fallbackErr) {
+      // Si todo falla, solo mostrar en consola
+      console.error(`Error escribiendo log: ${err.message}`);
+      console.log(logMessage);
+    }
+  }
 }
 
 // Ejecutar

@@ -24,14 +24,15 @@ const archivos = [
   { nombre: 'validaCodificacionAllSKU_v3.js', parametros: `${parametroFolder}` },
   { nombre: 'ValidaCSV_Headers_v6.js', parametros: `${parametroFolder}` },
   { nombre: 'ValidaCSV_SKU_TipodeDato_v9.js', parametros: `${parametroFolder}` },
+  
+  { nombre: 'BackupSKU_BeforeLoad.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
+  
   { nombre: 'loadCSVsku_v11.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'Mueve_SKUcsvProcesados_v2.js', parametros: `${parametroFolder}` },
   { nombre: 'LimpiaEspaciosSKU_v4.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'CsvTempl_sku_v3.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
-  { nombre: 'calcularNiveles.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` }, // Integración del cálculo de niveles
+  { nombre: 'calcularNiveles.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
   { nombre: 'Actualizar_Ubis_Saved.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
-
-
 ];
  
 const logFileName = 'LogdeCargaCSV';

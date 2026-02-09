@@ -15,7 +15,11 @@ const fieldValidations = {
   Origen_Abasto: { type: 'stringnullable', pattern: /^[A-Za-z0-9\s]*$/ }, // Permitir valores vacíos o alfanuméricos
   Cantidad_Demanda_Indirecta: { type: 'decimal' },
   Nivel_OA: { type: 'int', validValues: [1, 2, 3] }, // Solo 1, 2 o 3
-  Ignorar: {type: 'int', validValues: [0, 1]},
+  Ignorar: { type: 'int', validValues: [0, 1] },
+  Calculo_Demanda: { 
+    type: 'calculoDemanda', 
+    validValues: ['Promedio', 'PromMovil'] 
+  },
   Medida_Override: { type: 'stringMO', pattern: /^[A-Za-z0-9 ]+$/ },
   Tipo_Override: { type: 'stringTO', pattern: /^[A-Za-z0-9 ]+$/ },
   MargenUnitario: { type: 'decimal' },
@@ -42,22 +46,66 @@ function validateField(field, value) {
   switch (validation.type) {
     case 'string':
       return typeof value === 'string' && validation.pattern.test(value);
+
     case 'stringnullable': // Nueva validación para campos que pueden estar vacíos
-      return value === null || value === '' || (typeof value === 'string' && validation.pattern.test(value));
+      return (
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && validation.pattern.test(value))
+      );
+
     case 'stringnullesp':
-      return value === null || value === '' || (typeof value === 'string' && validation.pattern.test(value));
+      return (
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && validation.pattern.test(value))
+      );
+
     case 'int':
-      return value === null || value === '' || Number.isInteger(Number(value));
+      return (
+        value === null ||
+        value === '' ||
+        Number.isInteger(Number(value))
+      );
+
     case 'stringMO':
-      return (value === 'Cantidad' || value === 'Dias de Cobertura' || value === null || value === '') || 
-             (typeof value === 'string' && validation.pattern.test(value));
+      return (
+        value === 'Cantidad' ||
+        value === 'Dias de Cobertura' ||
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && validation.pattern.test(value))
+      );
+
     case 'stringTO':
-      return (value === 'SS' || value === 'ROP' || value === null || value === '') || 
-             (typeof value === 'string' && validation.pattern.test(value));
+      return (
+        value === 'SS' ||
+        value === 'ROP' ||
+        value === null ||
+        value === '' ||
+        (typeof value === 'string' && validation.pattern.test(value))
+      );
+
     case 'decimal':
-      return value === null || value === '' || (!isNaN(value) && !Number.isNaN(parseFloat(value)));
+      return (
+        value === null ||
+        value === '' ||
+        (!isNaN(value) && !Number.isNaN(parseFloat(value)))
+      );
+
     case 'decimalOrBlank':
-      return value.trim() === '' || (!isNaN(value) && !Number.isNaN(parseFloat(value)));
+      return (
+        value.trim() === '' ||
+        (!isNaN(value) && !Number.isNaN(parseFloat(value)))
+      );
+
+    case 'calculoDemanda':
+      return (
+        value === null ||
+        value === '' ||
+        validation.validValues.includes(String(value).trim())
+      );
+
     default:
       return true;
   }
@@ -105,7 +153,3 @@ fs.createReadStream(inputFile)
       console.error('Ocurrió un error al procesar el archivo:', error);
     }
   });
-
-
-
-  

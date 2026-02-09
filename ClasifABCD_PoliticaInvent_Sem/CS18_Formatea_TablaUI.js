@@ -44,8 +44,9 @@ async function copiarDatos() {
         ...dato,
         Demanda_Costo: formatearNumero(dato.Demanda_Costo),
         Demanda_Promedio_Semanal_Costo: formatearNumero(dato.Demanda_Promedio_Semanal_Costo),
-        Variabilidad_Demanda: formatearNumero(dato.Variabilidad_Demanda),
-        DS_Demanda: formatearNumero(dato.DS_Demanda),
+        //Variabilidad_Demanda: formatearNumero(dato.Variabilidad_Demanda),
+        //DS_Demanda: formatearNumero(dato.DS_Demanda),
+       STDEV_Demanda: formatearNumero(dato.STDEV_Demanda),
         Coeficiente_Variabilidad: formatearNumero(dato.Coeficiente_Variabilidad)
       };
     });

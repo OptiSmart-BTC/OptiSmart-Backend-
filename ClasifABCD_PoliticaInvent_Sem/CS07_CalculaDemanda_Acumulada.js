@@ -31,7 +31,7 @@ async function obtenerRegistros() {
     const database = client.db(`${dbName}`);
     const collection = database.collection('demanda_ordenada_desc_sem'); 
 
-    const registros = await collection.find().sort({ Ubicacion: -1 }).toArray(); 
+    const registros = await collection.find().sort({ Ubicacion: 1,Demanda_Porcentaje: -1 }).toArray(); 
     return registros;
   } catch (error) {
     writeToLog(`${now} - Error al obtener los registros: ${error}`);

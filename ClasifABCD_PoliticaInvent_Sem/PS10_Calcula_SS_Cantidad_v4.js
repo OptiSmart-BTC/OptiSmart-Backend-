@@ -28,7 +28,6 @@ async function calculateAndSetSSCantidad() {
     const db = client.db(`${dbName}`); 
     const col = db.collection('politica_inventarios_01_sem');
 
-
     const result = await col.find().toArray();
 
     const processedResult = result.map(item => {
@@ -78,9 +77,10 @@ async function calculateAndSetSSCantidad() {
         resultado = item.STAT_SS;
       }
     
+      // CAMBIO CRÍTICO: Redondear hacia arriba el resultado final
       return {
         ...item,
-        resultado
+        resultado: Math.ceil(resultado) // ← AGREGADO
       };
     });
     
@@ -90,20 +90,9 @@ async function calculateAndSetSSCantidad() {
         { $set: { 'SS_Cantidad': item.resultado } }
       );
     }
-    // Actualizar los documentos con el resultado calculado
-    /*
-    for (const doc of result) {
-      await col.updateOne(
-        { _id: doc._id },
-        { $set: { 'SS_Cantidad': doc.SS_Cantidad } }
-      );
-    }
-*/
-    //console.log('Se ha actualizado el campo SS_Cantidad.');
-    //writeToLog(`${now} - Ejecucion exitosa`);
+
     writeToLog(`\tTermina el Calculo del Inventario de Seguridad`);
   } catch (error) {
-    //console.error('Ocurrió un error:', err);
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
     await client.close();

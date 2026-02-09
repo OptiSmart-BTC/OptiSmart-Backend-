@@ -13,7 +13,7 @@ const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion_Se,.log`;
+const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
 const collection1 = 'plan_reposicion_01_sem';

@@ -9,11 +9,7 @@ const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
 
-//const url = `mongodb://${host}:${puerto}/${dbName}`;
-//const url = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
 const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-
-
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
@@ -21,36 +17,37 @@ const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`; 
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
-
-// Configurar la conexión a la base de datos
-//const url = 'mongodb://127.0.0.1:27017'; // Cambia la URL según tu configuración
-//const dbName = 'btc_opti_a001'; // Cambia el nombre de la base de datos
 const collection = 'politica_inventarios_01_sem';
 
-// Realizar los cálculos y la actualización
 async function actualizarDatos() {
 
-  //writeToLog('------------------------------------------------------------------------------');
   writeToLog(`\nPaso 10.1 - Determina si se requiere Override o no`);
 
   let client;
   try {
 
   client = await MongoClient.connect(mongoUri);
-  //const client = await MongoClient.connect(url);
   const db = client.db(dbName);
-
-  // Obtener la colección (política_inventarios_01)
   const col = db.collection(collection);
 
-  // Realizar los cálculos y la actualización
+  // MEJORA: Comparar valores redondeados para evitar falsos positivos
   const result = await col.aggregate([
     {
       $project: {
         _id: 1,
+        SS_Cantidad: 1,
+        STAT_SS: 1,
+        // Redondear ambos antes de comparar
+        SS_Redondeado: { $ceil: { $ifNull: ['$SS_Cantidad', 0] } },
+        STAT_Redondeado: { $ceil: { $ifNull: ['$STAT_SS', 0] } },
         Override_SI_NO: {
           $cond: {
-            if: { $ne: ['$SS_Cantidad', '$STAT_SS'] },
+            if: { 
+              $ne: [
+                { $ceil: { $ifNull: ['$SS_Cantidad', 0] } },
+                { $ceil: { $ifNull: ['$STAT_SS', 0] } }
+              ]
+            },
             then: 'SI',
             else: 'NO'
           }
@@ -59,14 +56,48 @@ async function actualizarDatos() {
     }
   ]).toArray();
 
-  //writeToLog(`${result}`);
-  /*const formattedResult = result.map(doc => ({
-    _id: doc._id,
-    Prom_LT: doc.Prom_LT
-  }));
-  
-  writeToLog(JSON.stringify(formattedResult, null, 2));
-*/
+  // Análisis detallado
+  const stats = {
+    total: result.length,
+    overrideSI: 0,
+    overrideNO: 0,
+    ambosZero: 0,
+    soloSSZero: 0
+  };
+
+  result.forEach(doc => {
+    if (doc.Override_SI_NO === 'SI') stats.overrideSI++;
+    else stats.overrideNO++;
+    
+    if (doc.SS_Redondeado === 0 && doc.STAT_Redondeado === 0) stats.ambosZero++;
+    else if (doc.SS_Redondeado === 0) stats.soloSSZero++;
+  });
+
+  writeToLog(`\n\tESTADÍSTICAS DE OVERRIDE:`);
+  writeToLog(`\t  Total: ${stats.total}`);
+  writeToLog(`\t  Override SI: ${stats.overrideSI}`);
+  writeToLog(`\t  Override NO: ${stats.overrideNO}`);
+  writeToLog(`\t  Ambos en 0 (NO override): ${stats.ambosZero}`);
+  writeToLog(`\t  Solo SS_Cantidad en 0 (SI override): ${stats.soloSSZero}`);
+
+  // Mostrar ejemplos
+  const ejemplosSI = result.filter(r => r.Override_SI_NO === 'SI').slice(0, 3);
+  const ejemplosNO = result.filter(r => r.Override_SI_NO === 'NO' && r.SS_Redondeado === 0).slice(0, 3);
+
+  if (ejemplosSI.length > 0) {
+    writeToLog(`\n\tEjemplos Override SI:`);
+    ejemplosSI.forEach(e => {
+      writeToLog(`\t  _id: ${e._id}, SS: ${e.SS_Cantidad} → ${e.SS_Redondeado}, STAT: ${e.STAT_SS} → ${e.STAT_Redondeado}`);
+    });
+  }
+
+  if (ejemplosNO.length > 0) {
+    writeToLog(`\n\tEjemplos Override NO con SS=0:`);
+    ejemplosNO.forEach(e => {
+      writeToLog(`\t  _id: ${e._id}, SS: ${e.SS_Cantidad} → ${e.SS_Redondeado}, STAT: ${e.STAT_SS} → ${e.STAT_Redondeado}`);
+    });
+  }
+
   for (const doc of result) {
     await col.updateOne(
       { _id: doc._id },
@@ -77,8 +108,8 @@ async function actualizarDatos() {
       }
     );
   }
-console.log(result);
-  writeToLog(`\tTermina la Determinacion de Requerimiento de Override`);
+
+  writeToLog(`\n\tTermina la Determinacion de Requerimiento de Override`);
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
@@ -88,10 +119,8 @@ console.log(result);
   }
 }
 
-
 function writeToLog(message) {
   fs.appendFileSync(logFile, message + '\n');
 }
 
-// Llamar a la función para actualizar los datos
 actualizarDatos().catch(console.error);

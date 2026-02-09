@@ -21,7 +21,7 @@ const encabezadosRequeridos = [
 'Ubicacion',
 'Desc_Ubicacion',
 'Origen_Abasto',
-'Ignorar',
+'Ignorar',   // ← NUEVA COLUMNA
 'OverrideClasificacionABCD',
 'Override_Min_Politica_Inventarios',
 'Override_Max_Politica_Inventarios',
@@ -41,9 +41,11 @@ const encabezadosRequeridos = [
 'Presentacion',
 'Desc_Empaque_UOM_Base',
 'Unidades_Empaque',
+'Calculo_Demanda',
 'Cantidad_Demanda_Indirecta',
 'Nivel_OA'
-]; 
+];
+
 
 
 
