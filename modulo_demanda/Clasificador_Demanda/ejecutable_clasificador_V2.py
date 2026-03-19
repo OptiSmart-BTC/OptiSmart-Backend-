@@ -180,14 +180,20 @@ def analyze_demand_patterns(df):
                 .reindex(full_date_range, fill_value=0)['Cantidad']
             )
 
-        # Métricas + categoría
+        # ✅ NUEVO: % ceros y puntos (sobre serie completa / reindexada)
+        porcentaje_ceros = float((complete_series == 0).mean())
+        data_points_complete = int(len(complete_series))
+        data_points_raw = int(len(series_data))
+
+        # Métricas + categoría (sobre serie completa)
         metrics = calculate_sbc_metrics(complete_series)
         category = classify_sbc(metrics['ADI'], metrics['CV2'])
 
-        # Línea única por DFU (como pediste), con ADI/CV2/Category
+        # Línea única por DFU (como pediste), con ADI/CV2/Category + %ceros
         logging.info(
             f"[{idx}/{total_series}] DFU={series_key} | "
-            f"puntos={len(series_data)} | "
+            f"puntos_raw={data_points_raw} puntos_complete={data_points_complete} | "
+            f"%ceros={porcentaje_ceros:.4f} | "
             f"min={fechas.min().date()} max={fechas.max().date()} | "
             f"mensual={is_monthly} | "
             f"ADI={_fmt_num(metrics['ADI'])} | "
@@ -203,7 +209,12 @@ def analyze_demand_patterns(df):
             'ADI': metrics['ADI'],
             'CV2': metrics['CV2'],
             'Category': category,
-            'Data_Points': len(series_data),
+
+            # ✅ Para filtros del Manual (y trazabilidad)
+            'Data_Points': data_points_complete,     # consistente con serie completa
+            'Raw_Data_Points': data_points_raw,      # original (informativo)
+            'Porcentaje_Ceros': porcentaje_ceros,    # <-- NUEVO
+
             'fecha_clasificacion': process_ts
         })
 
@@ -222,10 +233,10 @@ def analyze_demand_patterns(df):
 # -------------------------
 def get_model_recommendations(category):
     recommendations = {
-        'Suave': ['Promedio Móvil', 'Suavizado Exponencial', 'ARIMA'],
-        'Errática': ['Croston', 'SBA (Syntetos-Boylan Approximation)'],
-        'Intermitente': ['Croston', 'TSB (Teunter-Syntetos-Babai)'],
-        'Lumpy/Irregular': ['Croston modificado', 'Bootstrap']
+        'Suave': ['Prophet','Arima'],
+        'Errática': ['Arima','Prophet'],
+        'Intermitente': ['TSB (Teunter-Syntetos-Babai)','Croston'],
+        'Lumpy/Irregular': ['TSB (Teunter-Syntetos-Babai)','Croston']
     }
     return recommendations.get(category, [])
 

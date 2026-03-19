@@ -1,0 +1,62 @@
+{
+  "global": {
+    "router_mode": "auto"
+  },
+  "router": {
+    "router_fallback": ["prophet", "arima", "tsb", "croston"],
+    "dfu_recommendations": {},
+    "dfu_selected_models": {},
+    "router_source_collection": ""
+  },
+  "arima": {
+    "auto": true,
+    "two_stage": true,
+    "use_seasonal": true,
+    "max_p": 3,
+    "max_q": 3,
+    "max_d": 1,
+    "seasonal_P_candidates": [0, 1],
+    "seasonal_D_candidates": [0, 1],
+    "seasonal_Q_candidates": [0, 1],
+    "maxiter_search": 24,
+    "maxiter_final": 120,
+    "search_budget_sec": 180,
+    "fit_method": "lbfgs",
+    "enforce_stationarity": true,
+    "enforce_invertibility": true
+  },
+  "prophet": {
+    "enable_tuning": true,
+    "n_trials": 100,
+    "tuning_objective": "wmape",
+
+    "target_transform": "none",
+    "outlier_clip": { "enabled": false },
+
+    "add_mx_holidays": true,
+    "add_calendar_regressors": true,
+
+    "add_monthly_seasonality": true,
+    "add_quarterly_seasonality": false,
+
+    "seasonality_mode_choices": ["multiplicative", "additive"],
+
+    "tuning_ranges": {
+      "changepoint_prior_scale": [0.02, 0.6],
+      "seasonality_prior_scale": [0.5, 20.0],
+      "n_changepoints": [20, 80]
+    },
+
+    "changepoint_range_bounds": [0.85, 0.98]
+  },
+  "croston": {
+    "alpha": 0.1,
+    "min_occurrences": 2
+  },
+  "tsb": {
+    "alpha": 0.1,
+    "beta": 0.1,
+    "min_occurrences": 2,
+    "future_strategy": "constant"
+  }
+}

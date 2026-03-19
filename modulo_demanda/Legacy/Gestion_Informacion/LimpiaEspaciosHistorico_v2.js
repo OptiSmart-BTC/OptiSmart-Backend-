@@ -7,8 +7,8 @@ const now = moment().format('YYYY-MM-DD HH:mm:ss');
 const dbName = process.argv.slice(2)[0];
 const parametroFolder = process.argv.slice(2)[1];
 
-const { decryptData } = require('./DeCriptaPassAppDb');
-const { host, puerto } = require('../../Configuraciones/ConexionDB');
+const { decryptData } = require('../../Gestion_informacion/DeCriptaPassAppDb');
+const { host, puerto } = require('../../../Configuraciones/ConexionDB');
 const { DBUser, DBPassword } = require(`../../../${parametroFolder}/cfg/dbvars`);
 const logFile = `../../../${parametroFolder}/log/Logs_demanda.log`; 
 const csvPath = `../../../${parametroFolder}/reportes/historico_demanda_cantidad_0.csv`;

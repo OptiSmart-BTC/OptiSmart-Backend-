@@ -14,6 +14,9 @@ const {
   cleanupInactiveParticipants,
   cleanupAllOpenSessions,
   getFilterOptions,
+  getDfuSeries,
+  getDfuComments,
+  addDfuComment
 } = require("./planner.service");
 
 function plannerRouter() {
@@ -368,6 +371,94 @@ r.get('/status/:sessionId', async (req, res) => {
     });
   } catch (e) {
     console.error('Error GET /status/:sessionId:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===================== DFU DETAIL =====================
+// GET /planner/:sessionId/dfu/detail?Producto=&Canal=&Ubicacion=&fromDate=&toDate=&commentsLimit=
+r.get("/:sessionId/dfu/detail", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const {
+      Producto,
+      Canal,
+      Ubicacion,
+      fromDate,
+      toDate,
+      commentsLimit = 50,
+    } = req.query;
+
+    const seriesOut = await getDfuSeries(req.db, {
+      session_id: sessionId,
+      Producto,
+      Canal,
+      Ubicacion,
+      fromDate,
+      toDate,
+    });
+
+    const comments = await getDfuComments(req.db, {
+      Producto,
+      Canal,
+      Ubicacion,
+      limit: Number(commentsLimit) || 50,
+    });
+
+    res.json({
+      ok: true,
+      dfu: { Producto, Canal, Ubicacion },
+      range: { fromDate: fromDate || null, toDate: toDate || null },
+      ...seriesOut,
+      comments,
+    });
+  } catch (e) {
+    console.error("Error /:sessionId/dfu/detail:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===================== DFU COMMENTS =====================
+// GET /planner/:sessionId/dfu/comments?Producto=&Canal=&Ubicacion=&limit=&before=
+r.get("/:sessionId/dfu/comments", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { Producto, Canal, Ubicacion, limit = 50, before } = req.query;
+
+    const comments = await getDfuComments(req.db, {
+      Producto,
+      Canal,
+      Ubicacion,
+      limit: Number(limit) || 50,
+      before,
+    });
+
+    res.json({ ok: true, comments });
+  } catch (e) {
+    console.error("Error /:sessionId/dfu/comments:", e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /planner/:sessionId/dfu/comments  { Producto, Canal, Ubicacion, text }
+r.post("/:sessionId/dfu/comments", async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { Producto, Canal, Ubicacion, text } = req.body || {};
+    const user = req.appUser || req.headers["x-app-user"] || null;
+
+    const out = await addDfuComment(req.db, {
+      session_id: sessionId,
+      Producto,
+      Canal,
+      Ubicacion,
+      user,
+      text,
+    });
+
+    res.json(out);
+  } catch (e) {
+    console.error("Error POST /:sessionId/dfu/comments:", e);
     res.status(500).json({ error: e.message });
   }
 });

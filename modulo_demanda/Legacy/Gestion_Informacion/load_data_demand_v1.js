@@ -11,8 +11,8 @@ const user = process.argv[4];  // El usuario que ejecuta la operación
 const selectedCollection = process.argv[5]; // El nombre de la colección según la selección del usuario
 
 // Variables de configuración para conectarse a MongoDB
-const { decryptData } = require('../DeCriptaPassAppDb');
-const { host, puerto } = require('../../Configuraciones/ConexionDB');
+const { decryptData } = require('../../DeCriptaPassAppDb');
+const { host, puerto } = require('../../../Configuraciones/ConexionDB');
 const { DBUser, DBPassword } = require(`../../../${user}/cfg/dbvars`);
 const logFile = path.join(__dirname, `../../../${user}/log/LogdeCargaCSV.log`);
 

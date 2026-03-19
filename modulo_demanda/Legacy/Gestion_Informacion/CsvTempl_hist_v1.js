@@ -6,7 +6,7 @@ const fs = require('fs');
 const dbName = process.argv.slice(2)[0];
 const parametroFolder = process.argv.slice(2)[1];
  
-const { decryptData } = require('./DeCriptaPassAppDb');
+const { decryptData } = require('../../Gestion_informacion/DeCriptaPassAppDb');
 const { host, puerto } = require('../Configuraciones/ConexionDB');
 //const { DBUser, DBPassword } = require(`../../${parametroFolder}/cfg/uservars`);
 const { DBUser, DBPassword } = require(`../../${parametroFolder}/cfg/dbvars`);

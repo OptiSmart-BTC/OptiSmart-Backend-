@@ -11,9 +11,25 @@ async function ensurePlannerIndexes(db) {
     { key: { session_id: 1, Fecha: 1 } },
   ]);
 
-  await db.collection('planner_audit').createIndexes([
-    { key: { session_id: 1, 'cell.Producto': 1, 'cell.Canal': 1, 'cell.Ubicacion': 1, 'cell.Fecha': 1 } },
-    { key: { timestamp: -1 } },
-  ]);
+await db.collection('planner_audit').createIndexes([
+  {
+    key: {
+      'cell.Producto': 1,
+      'cell.Canal': 1,
+      'cell.Ubicacion': 1,
+      timestamp: -1,
+    },
+  },
+  // opcional: si también filtras por session_id a veces
+  {
+    key: {
+      session_id: 1,
+      'cell.Producto': 1,
+      'cell.Canal': 1,
+      'cell.Ubicacion': 1,
+      timestamp: -1,
+    },
+  },
+]);
 }
 module.exports = { ensurePlannerIndexes };

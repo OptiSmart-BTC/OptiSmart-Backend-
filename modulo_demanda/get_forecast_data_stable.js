@@ -24,39 +24,14 @@ async function getForecastData() {
     await client.connect();
 
     const db = client.db(`btc_opti_${dbName}`);
-    // En FRS guardamos histórico (fit) + futuro en demand_forecast con campo `tipo`
-    const forecastCollection = db.collection('demand_forecast');
+    const forecastCollection = db.collection('demand_forecast_actual'); // Colección de forecast
 
-    // 1) Identificar la corrida más reciente (forecast_date) a nivel DB
-    const latestRunDoc = await forecastCollection
+    // Obtener todos los datos de forecast
+    const forecastData = await forecastCollection
       .find({})
-      .project({ _id: 0, forecast_date: 1 })
-      .sort({ forecast_date: -1 })
-      .limit(1)
+      .project({ _id: 0, Fecha: 1, 'Demanda Predicha': 1, forecast_date: 1, Producto: 1, Canal: 1, Ubicacion: 1 })
+      //.sort({ forecast_date: -1, Fecha: 1 }) // Ordenar primero por forecast_date descendente, luego por Fecha ascendente
       .toArray();
-
-    const latestForecastDate = latestRunDoc?.[0]?.forecast_date || null;
-
-    // 2) Obtener únicamente los puntos FUTUROS de esa corrida (para la tabla principal)
-    const forecastQuery = latestForecastDate
-      ? { forecast_date: latestForecastDate, tipo: 'future' }
-      : { tipo: 'future' };
-
-const forecastData = await forecastCollection
-  .find(forecastQuery)
-  .project({
-    _id: 0,
-    Fecha: 1,
-    'Demanda Predicha': 1,
-    'Demanda Planeada': 1,
-    forecast_date: 1,
-    Producto: 1,
-    Canal: 1,
-    Ubicacion: 1,
-    tipo: 1
-  })
-  .sort({ Producto: 1, Canal: 1, Ubicacion: 1, Fecha: 1 })
-  .toArray();
 
     if (forecastData.length === 0) {
       console.log('No se encontraron datos de forecast.');

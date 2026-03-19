@@ -1,3 +1,4 @@
+/*
 const { exec } = require('child_process');
 const { MongoClient } = require('mongodb');
 const { decryptData } = require('./DeCriptaPassAppDb');
@@ -114,3 +115,113 @@ async function getDecryptedPassadmin() {
 
 // Ejecutar el script de Python y actualizar forecast_actual
 ejecutarPython(minRegistros, maxPorcentajeCeros, periodoAPredecir);
+*/
+
+const { exec } = require("child_process");
+const { MongoClient } = require("mongodb");
+const { decryptData } = require("./DeCriptaPassAppDb");
+const { host, puerto } = require("../../Configuraciones/ConexionDB");
+const path = require("path");
+
+const appuser = process.argv[2];
+const dbName = `btc_opti_${process.argv[3]}`;
+const minRegistros = process.argv[4];
+const maxPorcentajeCeros = process.argv[5];
+const periodoAPredecir = process.argv[6];
+const algorithm = (process.argv[7] || "prophet").toLowerCase();
+
+const { DBUser, DBPassword } = require(`../../../${appuser}/cfg/dbvars`);
+
+const ALLOWED_ALGOS = new Set(["prophet", "croston", "tsb", "arima","auto","manual"]);
+if (!ALLOWED_ALGOS.has(algorithm)) {
+  console.error(`Algoritmo inválido: ${algorithm}`);
+  process.exit(1);
+}
+
+async function ejecutarPython(minRegistros, maxPorcentajeCeros, periodoAPredecir, algorithm) {
+  try {
+    const passadminDeCripta = await getDecryptedPassadmin();
+    const mongoUrl = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/?authSource=admin`;
+
+    const pythonScript = path.join(__dirname, "output_a_mongo_v3.py");
+    const userCollection = `historico_demanda_${appuser}`;
+
+    // IMPORTANTE: algorithm como string (va como token, python lo lee como argv)
+    const command = `python ${pythonScript} "${dbName}" "${userCollection}" "${mongoUrl}" ${minRegistros} ${maxPorcentajeCeros} ${periodoAPredecir} "${algorithm}"`;
+
+    console.log(`Iniciando forecast con algorithm="${algorithm}"...`);
+    console.log(`Ejecutando: ${command}`);
+
+    exec(command, { maxBuffer: 1024 * 1024 * 50 }, async (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error al ejecutar el script Python: ${error.message}`);
+        return;
+      }
+
+      if (stderr && stderr.trim()) {
+        console.warn(`Advertencia (stderr): ${stderr}`);
+      }
+
+      // normalmente stdout vendrá vacío porque Python redirige al forecast_*.log
+      if (stdout && stdout.trim()) console.log(`Salida de Python: ${stdout}`);
+      console.log("Proceso de forecasting terminado.");
+
+      try {
+        console.log("Actualizando demand_forecast_actual...");
+        await actualizarForecastActual();
+        console.log("Actualización demand_forecast_actual completada.");
+      } catch (updateError) {
+        console.error("Error al actualizar demand_forecast_actual:", updateError);
+      }
+    });
+  } catch (error) {
+    console.error(`Error en el proceso de ejecución: ${error.message}`);
+  }
+}
+
+async function actualizarForecastActual() {
+  let client;
+  try {
+    const passadminDeCripta = await getDecryptedPassadmin();
+    const mongoURI = `mongodb://${DBUser}:${passadminDeCripta}@${host}:${puerto}/${dbName}?authSource=admin`;
+
+    client = await MongoClient.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    const db = client.db();
+    const forecastCollection = db.collection("demand_forecast");
+    const forecastActualCollection = db.collection("demand_forecast_actual");
+
+    const maxForecastDate = await forecastCollection
+      .find({})
+      .sort({ forecast_date: -1 })
+      .limit(1)
+      .toArray();
+
+    if (maxForecastDate.length === 0) {
+      console.log("No se encontraron registros en demand_forecast.");
+      return;
+    }
+
+    const latestDate = maxForecastDate[0].forecast_date;
+
+    await forecastActualCollection.deleteMany({});
+    const latestForecastData = await forecastCollection.find({ forecast_date: latestDate }).toArray();
+
+    if (latestForecastData.length > 0) {
+      await forecastActualCollection.insertMany(latestForecastData);
+      console.log(`${latestForecastData.length} registros copiados a demand_forecast_actual.`);
+    } else {
+      console.log("No se encontraron registros con la fecha más reciente.");
+    }
+  } finally {
+    if (client) await client.close();
+  }
+}
+
+async function getDecryptedPassadmin() {
+  return await decryptData(`${DBPassword}`);
+}
+
+ejecutarPython(minRegistros, maxPorcentajeCeros, periodoAPredecir, algorithm);

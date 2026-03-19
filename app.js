@@ -16,14 +16,18 @@ const { ObjectId } = require("mongodb");
 require("dotenv").config();
 
 // === [Planner] BEGIN imports ===
-const { plannerRouter } = require('./modulo_demanda/planner/api/planner.router');
-const { getDb } = require('./modulo_demanda/planner/db/conn.manager');
-const { ensurePlannerIndexes } = require('./modulo_demanda/planner/db/planner.indexes');
+const {
+  plannerRouter,
+} = require("./modulo_demanda/planner/api/planner.router");
+const { getDb } = require("./modulo_demanda/planner/db/conn.manager");
+const {
+  ensurePlannerIndexes,
+} = require("./modulo_demanda/planner/db/planner.indexes");
 const {
   cleanupAllOpenSessions,
-} = require('./modulo_demanda/planner/api/planner.service'); 
+} = require("./modulo_demanda/planner/api/planner.service");
 const { Server } = require("socket.io");
-//const { attachPlannerHub } = require("./modulo_demanda/planner/realtime/planner.hub"); 
+//const { attachPlannerHub } = require("./modulo_demanda/planner/realtime/planner.hub");
 // === [Planner] END imports ===
 
 const conex = require("./Configuraciones/ConStrDB");
@@ -135,13 +139,18 @@ function registerTenant(appUser, dbName) {
  */
 async function sweepAllTenants(graceSeconds = 90) {
   for (const key of ACTIVE_TENANTS) {
-    const [appUser, dbName] = key.split('::');
+    const [appUser, dbName] = key.split("::");
     try {
       const db = await getDb(appUser, dbName);
       const results = await cleanupAllOpenSessions(db, { graceSeconds });
-      const closed = results.filter(r => r.auto && r.auto.closed).map(r => r.session_id);
+      const closed = results
+        .filter((r) => r.auto && r.auto.closed)
+        .map((r) => r.session_id);
       if (closed.length) {
-console.log(`Modulo de demanda:Planner >> Sesion cerrada debido a inactividad. Base de datos: ${dbName}:`, closed);
+        console.log(
+          `Modulo de demanda:Planner >> Sesion cerrada debido a inactividad. Base de datos: ${dbName}:`,
+          closed
+        );
       }
     } catch (e) {
       console.error(`[planner:cleanup] error tenant=${key}:`, e.message);
@@ -178,10 +187,10 @@ setInterval(async () => {
 }, 3000);
 */
 // ----------------------
-// Timer global (cada hora) 
+// Timer global (cada hora)
 // ----------------------
 const CLEANUP_INTERVAL_MS = 3_600_000; // 10 minutos
-const GRACE_SECONDS = 90;            // ventana de inactividad
+const GRACE_SECONDS = 90; // ventana de inactividad
 
 setInterval(() => {
   // si aún no hay tenants en memoria, no hace nada
@@ -2432,22 +2441,18 @@ app.post("/runOverridePlanReposicion", async (req, res) => {
         return;
       }
       console.log("Diario - Comando ejecutado con éxito:", stdout);
-      res
-        .status(200)
-        .json({
-          message: "Override diario ejecutado con éxito",
-          stdout,
-          stderr,
-        });
+      res.status(200).json({
+        message: "Override diario ejecutado con éxito",
+        stdout,
+        stderr,
+      });
     });
   } catch (err) {
     console.error("Diario - Error al procesar:", err);
-    res
-      .status(500)
-      .json({
-        message: "Error al procesar el override plan de reposición diario",
-        error: err,
-      });
+    res.status(500).json({
+      message: "Error al procesar el override plan de reposición diario",
+      error: err,
+    });
   }
 });
 
@@ -2860,12 +2865,10 @@ app.post("/applyGeneralOverride", async (req, res) => {
       }
 
       console.log("Salida estándar (stdout):", stdout);
-      res
-        .status(200)
-        .json({
-          mensaje: "General override aplicado correctamente",
-          resultados,
-        });
+      res.status(200).json({
+        mensaje: "General override aplicado correctamente",
+        resultados,
+      });
     });
   } catch (err) {
     console.error("General Override - Error al procesar:", err);
@@ -3298,12 +3301,10 @@ app.post("/getPowerBIEmbedToken", async (req, res) => {
       !process.env.REPORT_ID
     ) {
       console.error("Error: Faltan una o más variables de entorno necesarias.");
-      return res
-        .status(500)
-        .json({
-          message:
-            "Configuración del servidor incompleta. Por favor, verifica las variables de entorno.",
-        });
+      return res.status(500).json({
+        message:
+          "Configuración del servidor incompleta. Por favor, verifica las variables de entorno.",
+      });
     }
 
     // Paso 1: Obtener el token de acceso desde Azure
@@ -3367,19 +3368,15 @@ app.post("/getPowerBIEmbedToken", async (req, res) => {
       });
     } else if (error.request) {
       console.error("No hubo respuesta de la API:", error.message);
-      res
-        .status(500)
-        .json({
-          message:
-            "No hubo respuesta de la API de Power BI. Verifica la conexión de red.",
-        });
+      res.status(500).json({
+        message:
+          "No hubo respuesta de la API de Power BI. Verifica la conexión de red.",
+      });
     } else {
       console.error("Error al configurar la solicitud:", error.message);
-      res
-        .status(500)
-        .json({
-          message: "Error al configurar la solicitud a la API de Power BI",
-        });
+      res.status(500).json({
+        message: "Error al configurar la solicitud a la API de Power BI",
+      });
     }
   }
 });
@@ -3409,12 +3406,10 @@ app.post("/getPwBiUrl", async (req, res) => {
     // Verificamos si el archivo existe
     if (!fs.existsSync(pwbiFilePath)) {
       console.log(`El archivo ${pwbiFilePath} no existe.`);
-      return res
-        .status(404)
-        .json({
-          error:
-            "Archivo de configuración de Power BI no encontrado para el usuario.",
-        });
+      return res.status(404).json({
+        error:
+          "Archivo de configuración de Power BI no encontrado para el usuario.",
+      });
     }
 
     // Importamos el archivo y obtenemos los datos de Power BI
@@ -3887,17 +3882,17 @@ io.on("connection", (socket) => {
   console.log("Socket conectado:", socket.id, "user:", socket.appUser);
 
   // El frontend hace: s.emit("planner:join", { session_id })
-socket.on("planner:join", ({ session_id }) => {
-  if (!session_id) return;
-  socket.join(`planner:${session_id}`);
-  console.log(`Socket ${socket.id} entró a sesión planner:${session_id}`);
-});
+  socket.on("planner:join", ({ session_id }) => {
+    if (!session_id) return;
+    socket.join(`planner:${session_id}`);
+    console.log(`Socket ${socket.id} entró a sesión planner:${session_id}`);
+  });
 
-socket.on("planner:leave", ({ session_id }) => {
-  if (!session_id) return;
-  socket.leave(`planner:${session_id}`);
-  console.log(`Socket ${socket.id} salió de sesión planner:${session_id}`);
-});
+  socket.on("planner:leave", ({ session_id }) => {
+    if (!session_id) return;
+    socket.leave(`planner:${session_id}`);
+    console.log(`Socket ${socket.id} salió de sesión planner:${session_id}`);
+  });
 
   socket.on("disconnect", (reason) => {
     console.log("Socket desconectado:", socket.id, "razón:", reason);
@@ -4211,6 +4206,7 @@ app.get("/api/:selectedTable", (req, res) => {
 //$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+/*
 // Endpoint para ejecutar Prophet
 app.post("/api/forecast/run", (req, res) => {
   const { appUser, dbName, parameters } = req.body;
@@ -4276,6 +4272,92 @@ app.post("/api/forecast/run", (req, res) => {
     }
   });
 });
+*/
+
+// Endpoint para ejecutar Forecast (Prophet/Croston temporal)
+app.post("/api/forecast/run", (req, res) => {
+  const { appUser, dbName, parameters, algorithm } = req.body;
+
+  // Validar parámetros
+  if (!appUser || !dbName || !parameters) {
+    return res
+      .status(400)
+      .send("Faltan parámetros appUser, dbName o parameters.");
+  }
+
+  const { minRegistros, maxPorcentajeCeros, periodoAPredecir } = parameters;
+
+  // Validar valores de parámetros
+  if (
+    minRegistros <= 0 ||
+    maxPorcentajeCeros < 0 ||
+    maxPorcentajeCeros > 1 ||
+    periodoAPredecir <= 0
+  ) {
+    return res
+      .status(400)
+      .send(
+        "Parámetros inválidos. Verifica minRegistros, maxPorcentajeCeros y periodoAPredecir."
+      );
+  }
+
+  // Algorithm (temporal selector)
+  const algo = (algorithm || "prophet").toLowerCase();
+
+  // Whitelist
+  const allowed = new Set([
+    "prophet",
+    "croston",
+    "tsb",
+    "arima",
+    "auto",
+    "manual",
+  ]);
+  if (!allowed.has(algo)) {
+    return res.status(400).send(`Algoritmo inválido: ${algo}`);
+  }
+
+  // Definir la ruta al script de ejecución
+  const scriptPath = path.join(
+    __dirname,
+    "modulo_demanda",
+    "Algoritmo_Prophet",
+    "exec_algoritmo_prophet.js"
+  );
+
+  // Construir el comando para ejecutar el script
+  const command = `node ${scriptPath} "${appUser}" "${dbName}" ${minRegistros} ${maxPorcentajeCeros} ${periodoAPredecir} "${algo}"`;
+
+  console.log(`Ejecutando forecast con el comando: ${command}`);
+
+  // Ejecutar el script
+  exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Error al ejecutar el script: ${error.message}`);
+      return res.status(500).send("Error al ejecutar el forecast.");
+    }
+    if (stderr) {
+      console.error(`Error en el script de ejecución: ${stderr}`);
+      return res.status(500).send(`Error durante la ejecución: ${stderr}`);
+    }
+
+    try {
+      const result = stdout.trim();
+      console.log("Forecast ejecutado exitosamente:", result);
+      res.json({
+        message: "Forecast ejecutado exitosamente.",
+        result,
+        algorithm: algo,
+      });
+    } catch (parseError) {
+      console.error(
+        "Error al procesar el resultado del script:",
+        parseError.message
+      );
+      res.status(500).send("Error al procesar los resultados del forecast.");
+    }
+  });
+});
 
 module.exports = app;
 
@@ -4318,6 +4400,167 @@ app.get("/api/forecast/combinations", (req, res) => {
       res.status(500).send("Error al obtener combinaciones.");
     }
   });
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.get("/api/forecast/manual/dfus", async (req, res) => {
+  try {
+    const appUser = req.query.appUser;
+    let dbName = req.query.dbName;
+
+    const minRegistros = Number(req.query.minRegistros || 0);
+    const maxPorcentajeCeros = Number(req.query.maxPorcentajeCeros || 1);
+
+    if (!appUser || !dbName) {
+      return res.status(400).send("Faltan parámetros appUser o dbName.");
+    }
+
+    // normaliza prefijo (igual que planner)
+    if (!/^btc_opti_/i.test(dbName)) dbName = `btc_opti_${dbName}`;
+
+    const db = await getDb(appUser, dbName);
+    registerTenant(appUser, dbName);
+
+    const coll = db.collection("clasificacion_demanda_actual");
+
+    const docs = await coll
+      .find(
+        {},
+        {
+          projection: {
+            _id: 0,
+            Producto: 1,
+            Canal: 1,
+            Ubicacion: 1,
+            ADI: 1,
+            CV2: 1,
+            Category: 1,
+
+            // ✅ filtros reales
+            Data_Points: 1,
+            Porcentaje_Ceros: 1,
+            Raw_Data_Points: 1, // opcional
+
+            recommended_models: 1,
+            selected_model: 1,
+          },
+        }
+      )
+      .toArray();
+
+    const pickN = (d) => d.Data_Points ?? d.data_points ?? d.DataPoints ?? null;
+    const pickZ = (d) =>
+      d.Porcentaje_Ceros ?? d.porcentaje_ceros ?? d.pct_zeros ?? d.pct_ceros ?? null;
+
+    const allowedModels = ["prophet", "croston", "tsb", "arima"];
+
+    const rows = docs
+      .filter((d) => {
+        const n = pickN(d);
+        const z = pickZ(d);
+
+        // compatibilidad con docs viejos
+        if (n == null || z == null) return true;
+
+        return Number(n) >= minRegistros && Number(z) <= maxPorcentajeCeros;
+      })
+      .map((d) => {
+        const rec0 = Array.isArray(d.recommended_models)
+          ? d.recommended_models[0]
+          : "";
+
+        const modelo =
+          d.selected_model && String(d.selected_model).trim()
+            ? String(d.selected_model).trim().toLowerCase()
+            : String(rec0 || "").trim().toLowerCase();
+
+        return {
+          Producto: d.Producto,
+          Canal: d.Canal,
+          Ubicacion: d.Ubicacion,
+          ADI: d.ADI ?? null,
+          CV2: d.CV2 ?? null,
+          Categoria: d.Category ?? null,
+
+          // (opcionales por si quieres verlos en UI o debug)
+          Data_Points: d.Data_Points ?? null,
+          Porcentaje_Ceros: d.Porcentaje_Ceros ?? null,
+
+          Modelo: modelo,
+          selected_model: d.selected_model ?? null,
+          recommended_models: d.recommended_models ?? [],
+          available_models: allowedModels,
+        };
+      });
+
+    return res.json({ rows });
+  } catch (err) {
+    console.error("[manual/dfus] error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+//&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+app.put("/api/forecast/manual/selected-model", async (req, res) => {
+  try {
+    const { appUser, dbName, Producto, Canal, Ubicacion, selected_model } =
+      req.body;
+
+    if (
+      !appUser ||
+      !dbName ||
+      !Producto ||
+      !Canal ||
+      !Ubicacion ||
+      !selected_model
+    ) {
+      return res.status(400).send("Faltan parámetros.");
+    }
+
+    let dbNameNorm = dbName;
+    if (!/^btc_opti_/i.test(dbNameNorm)) dbNameNorm = `btc_opti_${dbNameNorm}`;
+
+    const allowed = new Set(["prophet", "croston", "tsb", "arima"]);
+    const sm = String(selected_model).trim().toLowerCase();
+    if (!allowed.has(sm)) {
+      return res.status(400).send(`selected_model inválido: ${sm}`);
+    }
+
+    const db = await getDb(appUser, dbNameNorm);
+    registerTenant(appUser, dbNameNorm);
+
+    const coll = db.collection("clasificacion_demanda_actual");
+
+    const r = await coll.updateOne(
+      { Producto, Canal, Ubicacion },
+      { $set: { selected_model: sm } }
+    );
+
+    if (r.matchedCount === 0) {
+      return res
+        .status(404)
+        .send("DFU no encontrado en clasificacion_demanda_actual.");
+    }
+
+    return res.json({
+      ok: true,
+      matched: r.matchedCount,
+      modified: r.modifiedCount,
+    });
+  } catch (err) {
+    console.error("[manual/selected-model] error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 //&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&

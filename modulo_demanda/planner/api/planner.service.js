@@ -812,89 +812,79 @@ async function upsertCellsBulk(db, { session_id, ops = [], requestId }) {
 }
 
 async function publishSession(db, { session_id }) {
-  const session = await db
-    .collection('planner_sessions')
-    .findOne({ session_id });
+  const session = await db.collection('planner_sessions').findOne({ session_id });
   if (!session) throw new Error('Session not found');
 
   const now = new Date();
   const cur = db.collection('planner_cells').find({ session_id });
-  const histOps = [],
-    actualOps = [];
+  const actualOps = [];
+  const histOps = [];
 
+  let rows = 0;
   for await (const c of cur) {
-    const demandaPredicha =
-      c.base_fcst == null ? null : Number(c.base_fcst);
+    rows++;
+
     const edited =
       c.plan_fcst != null &&
       c.base_fcst != null &&
       Number(c.plan_fcst) !== Number(c.base_fcst);
-    const demandaPlaneada = edited ? Number(c.plan_fcst) : undefined;
 
-    // demand_forecast (snapshot histórico)
-    const snapDoc = {
+    const filter = {
       Producto: c.Producto,
       Canal: c.Canal,
       Ubicacion: c.Ubicacion,
       Fecha: c.Fecha,
-      'Demanda Predicha': demandaPredicha,
-      forecast_date: now,
-      scenario_id: session_id,
-      source: 'planner',
     };
-    if (edited) snapDoc['Demanda Planeada'] = demandaPlaneada;
-    histOps.push({ insertOne: { document: snapDoc } });
 
-    // demand_forecast_actual (activo)
-    const updateSet = {
-      'Demanda Predicha': demandaPredicha,
-      forecast_date: now,
-      scenario_id: session_id,
-      source: 'planner',
-    };
-    const updateUnset = {};
     if (edited) {
-      updateSet['Demanda Planeada'] = demandaPlaneada;
-    } else {
-      updateUnset['Demanda Planeada'] = '';
-    }
-    const actualUpdate = { $set: updateSet };
-    if (Object.keys(updateUnset).length) actualUpdate.$unset = updateUnset;
-
-    actualOps.push({
-      updateOne: {
-        filter: {
-          Producto: c.Producto,
-          Canal: c.Canal,
-          Ubicacion: c.Ubicacion,
-          Fecha: c.Fecha,
+      const demandaPlaneada = Number(c.plan_fcst);
+      actualOps.push({
+        updateOne: {
+          filter,
+          update: { $set: { 'Demanda Planeada': demandaPlaneada } },
+          upsert: false,
         },
-        update: actualUpdate,
-        upsert: true,
-      },
-    });
-
-    if (histOps.length >= 5000) {
-      await db
-        .collection('demand_forecast')
-        .bulkWrite(histOps, { ordered: false });
-      histOps.length = 0;
+      });
+      histOps.push({
+        updateMany: {
+          filter,
+          update: { $set: { 'Demanda Planeada': demandaPlaneada } },
+          upsert: false,
+        },
+      });
+    } else {
+      actualOps.push({
+        updateOne: {
+          filter,
+          update: { $unset: { 'Demanda Planeada': '' } },
+          upsert: false,
+        },
+      });
+      histOps.push({
+        updateMany: {
+          filter,
+          update: { $unset: { 'Demanda Planeada': '' } },
+          upsert: false,
+        },
+      });
     }
+
     if (actualOps.length >= 5000) {
-      await db
-        .collection('demand_forecast_actual')
-        .bulkWrite(actualOps, { ordered: false });
+      await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered: false });
       actualOps.length = 0;
     }
+    if (histOps.length >= 5000) {
+      await db.collection('demand_forecast').bulkWrite(histOps, { ordered: false });
+      histOps.length = 0;
+    }
   }
-  if (histOps.length)
-    await db
-      .collection('demand_forecast')
-      .bulkWrite(histOps, { ordered: false });
-  if (actualOps.length)
-    await db
-      .collection('demand_forecast_actual')
-      .bulkWrite(actualOps, { ordered: false });
+
+  const actualRes = actualOps.length
+    ? await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered: false })
+    : null;
+  const histRes = histOps.length
+    ? await db.collection('demand_forecast').bulkWrite(histOps, { ordered: false })
+    : null;
 
   // Limpiar temporales de la sesión (planner_cells)
   await db.collection('planner_cells').deleteMany({ session_id });
@@ -909,97 +899,93 @@ async function publishSession(db, { session_id }) {
     }
   );
 
-  return { published_at: now, closed_at };
+  return {
+    published_at: now,
+    closed_at,
+    applied_cells: rows,
+    actual: actualRes ? { matched: actualRes.matchedCount, modified: actualRes.modifiedCount } : { matched: 0, modified: 0 },
+    historic: histRes ? { matched: histRes.matchedCount, modified: histRes.modifiedCount } : { matched: 0, modified: 0 },
+  };
 }
 
 async function saveSession(db, { session_id }) {
-  // Igual que publishSession, pero SIN borrar planner_cells
-  // y SIN cerrar la sesión.
-  const session = await db
-    .collection('planner_sessions')
-    .findOne({ session_id });
+  // Guarda cambios aplicando SOLO "Demanda Planeada"
+  // Mantiene la sesión abierta y NO borra planner_cells.
+
+  const session = await db.collection('planner_sessions').findOne({ session_id });
   if (!session) throw new Error('Session not found');
 
   const now = new Date();
   const cur = db.collection('planner_cells').find({ session_id });
 
-  const histOps = [],
-    actualOps = [];
+  const actualOps = [];
+  const histOps = [];
+  let rows = 0;
 
   for await (const c of cur) {
-    const demandaPredicha =
-      c.base_fcst == null ? null : Number(c.base_fcst);
+    rows++;
+
     const edited =
       c.plan_fcst != null &&
       c.base_fcst != null &&
       Number(c.plan_fcst) !== Number(c.base_fcst);
-    const demandaPlaneada = edited ? Number(c.plan_fcst) : undefined;
 
-    // Snapshot histórico (NO cierra sesión)
-    const snapDoc = {
+    const filter = {
       Producto: c.Producto,
       Canal: c.Canal,
       Ubicacion: c.Ubicacion,
       Fecha: c.Fecha,
-      'Demanda Predicha': demandaPredicha,
-      forecast_date: now,
-      scenario_id: session_id,
-      source: 'planner:save',
     };
-    if (edited) snapDoc['Demanda Planeada'] = demandaPlaneada;
-    histOps.push({ insertOne: { document: snapDoc } });
 
-    // Activo
-    const updateSet = {
-      'Demanda Predicha': demandaPredicha,
-      forecast_date: now,
-      scenario_id: session_id,
-      source: 'planner:save',
-    };
-    const updateUnset = {};
     if (edited) {
-      updateSet['Demanda Planeada'] = demandaPlaneada;
-    } else {
-      updateUnset['Demanda Planeada'] = '';
-    }
-    const actualUpdate = { $set: updateSet };
-    if (Object.keys(updateUnset).length) actualUpdate.$unset = updateUnset;
-
-    actualOps.push({
-      updateOne: {
-        filter: {
-          Producto: c.Producto,
-          Canal: c.Canal,
-          Ubicacion: c.Ubicacion,
-          Fecha: c.Fecha,
+      const demandaPlaneada = Number(c.plan_fcst);
+      actualOps.push({
+        updateOne: {
+          filter,
+          update: { $set: { 'Demanda Planeada': demandaPlaneada } },
+          upsert: false,
         },
-        update: actualUpdate,
-        upsert: true,
-      },
-    });
-
-    if (histOps.length >= 5000) {
-      await db
-        .collection('demand_forecast')
-        .bulkWrite(histOps, { ordered: false });
-      histOps.length = 0;
+      });
+      histOps.push({
+        updateMany: {
+          filter,
+          update: { $set: { 'Demanda Planeada': demandaPlaneada } },
+          upsert: false,
+        },
+      });
+    } else {
+      actualOps.push({
+        updateOne: {
+          filter,
+          update: { $unset: { 'Demanda Planeada': '' } },
+          upsert: false,
+        },
+      });
+      histOps.push({
+        updateMany: {
+          filter,
+          update: { $unset: { 'Demanda Planeada': '' } },
+          upsert: false,
+        },
+      });
     }
+
     if (actualOps.length >= 5000) {
-      await db
-        .collection('demand_forecast_actual')
-        .bulkWrite(actualOps, { ordered: false });
+      await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered: false });
       actualOps.length = 0;
+    }
+    if (histOps.length >= 5000) {
+      await db.collection('demand_forecast').bulkWrite(histOps, { ordered: false });
+      histOps.length = 0;
     }
   }
 
-  if (histOps.length)
-    await db
-      .collection('demand_forecast')
-      .bulkWrite(histOps, { ordered: false });
-  if (actualOps.length)
-    await db
-      .collection('demand_forecast_actual')
-      .bulkWrite(actualOps, { ordered: false });
+  const actualRes = actualOps.length
+    ? await db.collection('demand_forecast_actual').bulkWrite(actualOps, { ordered: false })
+    : null;
+  const histRes = histOps.length
+    ? await db.collection('demand_forecast').bulkWrite(histOps, { ordered: false })
+    : null;
 
   // Mantiene la sesión abierta; sólo actualiza updated_at
   await db.collection('planner_sessions').updateOne(
@@ -1007,7 +993,13 @@ async function saveSession(db, { session_id }) {
     { $set: { updated_at: new Date() } }
   );
 
-  return { published_at: now, closed: false };
+  return {
+    published_at: now,
+    closed: false,
+    applied_cells: rows,
+    actual: actualRes ? { matched: actualRes.matchedCount, modified: actualRes.modifiedCount } : { matched: 0, modified: 0 },
+    historic: histRes ? { matched: histRes.matchedCount, modified: histRes.modifiedCount } : { matched: 0, modified: 0 },
+  };
 }
 
 // === Participantes ===
@@ -1153,6 +1145,180 @@ async function getFilterOptions(db, { session_id }) {
   };
 }
 
+/* ========================== DFU DETAIL (SERIES + COMMENTS) ========================== */
+
+async function getDfuSeries(db, {
+  session_id,
+  Producto,
+  Canal,
+  Ubicacion,
+  fromDate,
+  toDate,
+}) {
+  if (!session_id) throw new Error('session_id requerido');
+  if (!Producto || !Canal || !Ubicacion) throw new Error('Producto/Canal/Ubicacion requeridos');
+
+  const q = { session_id, Producto, Canal, Ubicacion };
+
+  const f0 = toDateSafe(fromDate);
+  const f1 = toDateSafe(toDate);
+  if (f0 || f1) {
+    q.Fecha = {};
+    if (f0) q.Fecha.$gte = f0;
+    if (f1) q.Fecha.$lt = f1;
+  }
+
+  const rows = await db.collection('planner_cells')
+    .find(q, {
+      projection: {
+        _id: 0,
+        Fecha: 1,
+        actual: 1,
+        plan_fcst: 1,
+        base_fcst: 1,
+        prev_year: 1,
+        asertividad: 1,
+      }
+    })
+    .sort({ Fecha: 1 })
+    .toArray();
+
+  // Normaliza a series [{date, y}]
+  const series = {
+    actual: [],
+    plan_fcst: [],
+    base_fcst: [],
+    prev_year: [],
+    asertividad: [],
+  };
+
+  for (const r of rows) {
+    const iso = (r.Fecha instanceof Date ? r.Fecha : new Date(r.Fecha)).toISOString().slice(0, 10);
+
+    series.actual.push({ date: iso, y: r.actual ?? null });
+    series.plan_fcst.push({ date: iso, y: r.plan_fcst ?? null });
+    series.base_fcst.push({ date: iso, y: r.base_fcst ?? null });
+    series.prev_year.push({ date: iso, y: r.prev_year ?? null });
+    series.asertividad.push({ date: iso, y: r.asertividad ?? null });
+  }
+
+  return { rows: rows.length, series };
+}
+
+async function getDfuComments(db, {
+  // session_id ya NO es requerido para buscar; se puede usar como filtro opcional si lo quieres
+  session_id,
+  Producto,
+  Canal,
+  Ubicacion,
+  limit = 50,
+  before, // cursor opcional (timestamp)
+}) {
+  if (!Producto || !Canal || !Ubicacion) {
+    throw new Error('Producto/Canal/Ubicacion requeridos');
+  }
+
+  const q = {
+    'cell.Producto': Producto,
+    'cell.Canal': Canal,
+    'cell.Ubicacion': Ubicacion,
+    comment: { $ne: null },
+  };
+
+  // opcional: si algún día quieres filtrar solo por una sesión
+  if (session_id) q.session_id = session_id;
+
+  if (before) {
+    const dt = toDateSafe(before);
+    if (dt) q.timestamp = { $lt: dt };
+  }
+
+  const docs = await db.collection('planner_audit')
+    .find(q, {
+      projection: {
+        // dejamos session_id para traceability
+        before: 0,
+        after: 0,
+      },
+    })
+    .sort({ timestamp: -1 })
+    .limit(Math.min(200, Math.max(1, Number(limit) || 50)))
+    .toArray();
+
+  // Normaliza para UI
+  return docs.map((d) => ({
+    _id: d._id,
+    text: d.comment,
+    created_by: d.user || null,
+    created_at: d.timestamp,
+    session_id: d.session_id,
+    action: d.action,
+    cell: d.cell, // incluye Fecha (informativo)
+  }));
+}
+
+async function addDfuComment(db, {
+  session_id,
+  Producto,
+  Canal,
+  Ubicacion,
+  user,
+  text,
+}) {
+  if (!session_id) throw new Error('session_id requerido');
+  if (!Producto || !Canal || !Ubicacion) throw new Error('Producto/Canal/Ubicacion requeridos');
+
+  const t = String(text || '').trim();
+  if (!t) throw new Error('text requerido');
+  if (t.length > 2000) throw new Error('text demasiado largo (max 2000)');
+
+  const cells = db.collection('planner_cells');
+  const audit = db.collection('planner_audit');
+
+  // Tomamos una celda representativa del DFU (la más reciente)
+  const cellDoc = await cells.findOne(
+    { session_id, Producto, Canal, Ubicacion },
+    { sort: { Fecha: -1 }, projection: { _id: 1, Producto: 1, Canal: 1, Ubicacion: 1, Fecha: 1 } }
+  );
+
+  if (!cellDoc) throw new Error('No existe planner_cells para este DFU en esta sesión');
+
+  const now = new Date();
+
+  const out = await audit.insertOne({
+    session_id,
+    cell: {
+      _id: cellDoc._id,
+      Producto: cellDoc.Producto,
+      Canal: cellDoc.Canal,
+      Ubicacion: cellDoc.Ubicacion,
+      Fecha: cellDoc.Fecha,
+    },
+    user: user || null,
+    before: null,
+    after: null,
+    comment: t,
+    action: 'COMMENT',  // 👈 distingue de UPSERT
+    timestamp: now,
+  });
+
+  return {
+    ok: true,
+    _id: out.insertedId,
+    text: t,
+    created_by: user || null,
+    created_at: now,
+    cell: {
+      _id: cellDoc._id,
+      Producto: cellDoc.Producto,
+      Canal: cellDoc.Canal,
+      Ubicacion: cellDoc.Ubicacion,
+      Fecha: cellDoc.Fecha,
+    },
+    action: 'COMMENT',
+  };
+}
+
 module.exports = {
   openOrGetActiveSession,
   bootstrapSession,
@@ -1169,4 +1335,7 @@ module.exports = {
   listOpenSessions,
   cleanupAllOpenSessions,
   getFilterOptions,
+  getDfuSeries,
+  getDfuComments,
+  addDfuComment
 };

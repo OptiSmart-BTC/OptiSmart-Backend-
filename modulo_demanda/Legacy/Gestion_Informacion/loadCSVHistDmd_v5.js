@@ -11,8 +11,8 @@ const AppUser = process.argv[4]; // Añadido para mantener consistencia
 const csvFilePath = process.argv[5]?.replace(/"/g, ''); 
 
 // Configuración
-const { decryptData } = require('./DeCriptaPassAppDb');
-const { host, puerto } = require('../../Configuraciones/ConexionDB');
+const { decryptData } = require('../../Gestion_informacion/DeCriptaPassAppDb');
+const { host, puerto } = require('../../../Configuraciones/ConexionDB');
 const { DBUser, DBPassword } = require(`../../../${parametroFolder}/cfg/dbvars`);
 const logFile = path.join(__dirname, '..', '..', '..', parametroFolder, 'log', 'Logs_demanda.log');
 const user = parametroFolder.toLowerCase(); // Usuario en minúsculas

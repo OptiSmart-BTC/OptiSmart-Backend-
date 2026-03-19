@@ -1,4 +1,4 @@
-import plotly.graph_objects as go
+import plotly.graph_objects as go # type: ignore
 import os
 
 def graficar_forecast(df_merged, dmd_unit, dmd_group, loc, output_folder):

@@ -34,10 +34,10 @@ try {
 
   // Definición de scripts del pipeline
   const archivos = [
-    { nombre: 'validaCodificacionAllHistorico_v3.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
-    { nombre: 'ValidaCSV_Headers_v5.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
-    { nombre: 'ValidaCSV_HistoricoDemanda_TipodeDato_v4.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
-    { nombre: 'loadCSVHistDmd_v5.js', parametros: `${dbName} ${parametroFolder} ${AppUser} "${csvFileToProcess}"` },
+    { nombre: 'validaCodificacionAllHistorico_v4.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
+    { nombre: 'ValidaCSV_Headers_v6.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
+    { nombre: 'ValidaCSV_HistoricoDemanda_TipodeDato_v5.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
+    { nombre: 'loadCSVHistDmd_v6.js', parametros: `${dbName} ${parametroFolder} ${AppUser} "${csvFileToProcess}"` },
     { nombre: 'Mueve_HistoricoCSVProcesados_v2.js', parametros: `${parametroFolder} "${csvFileToProcess}"` },
     //{ nombre: 'LimpiaEspaciosHistorico_v2.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
     { nombre: 'LimpiaEspaciosHistorico_v3.js', parametros: `${dbName} ${parametroFolder} ${AppUser}` },
