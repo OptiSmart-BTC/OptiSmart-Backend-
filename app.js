@@ -26,7 +26,6 @@ const { Server } = require("socket.io");
 //const { attachPlannerHub } = require("./modulo_demanda/planner/realtime/planner.hub"); 
 // === [Planner] END imports ===
 
-
 const conex = require("./Configuraciones/ConStrDB");
 const { decryptData } = require("./DeCriptaPassAppDb");
 //const { host, puerto, useradmin, passadmin } = require('./Configuraciones/ConexionDB');
