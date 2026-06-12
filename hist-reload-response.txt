@@ -1,0 +1,74 @@
+Carga de SKUs
+
+Inicio de ejecucion: 2026-06-10 22:34:49
+
+Validaciones y Carga de datos de SKU
+
+Paso 01 - Revision de Encoding del CSV
+	Validacion de Encoding del archivo sku.csv realizada con exito.
+
+Paso 02.- Validacion de Headers del CSV
+	Los encabezados son válidos y están en el orden correcto.
+
+Paso 03.- Validación de tipos de dato
+	El archivo está correcto. No se encontraron errores. Total de filas: 35241
+
+Paso 04 - Carga del CSV de SKU
+	Número de registros cargados: 35241
+
+Paso 05 - Mueve Archivo Cargado a Procesados
+	Se movio archivo sin errores
+
+Paso 06 - Limpieza de Filas Vacias
+	Registros Vacios Eliminados En 'SKU': 0
+Paso 07 - Cálculo de Niveles OA (con corrección de autoabastecidos)
+	Autoabastecimientos corregidos: 0
+	Niveles OA actualizados: 0
+	Archivo CSV generado: ../../LOL/csv/out/sku_con_niveles.csv
+
+Paso 08 - Actualización de la colección 'ubis_saved'
+	Ubicaciones insertadas en 'ubis_saved': 49
+	Ubicaciones actualizadas en 'ubis_saved': 0
+	Ubicaciones eliminadas de 'ubis_saved': 0
+
+
+
+Terminan Validaciones y Carga de datos de SKU
+
+
+
+--------------------------------------------------------------------------
+Carga de Historico de Demanda
+
+Inicio de ejecucion: 2026-06-10 23:04:36
+
+Validaciones y Carga de datos del Historico de Ventas
+
+Paso 01 - Revision de Encoding del CSV
+	Validacion de Encoding del archivo historico_demanda.csv realizada con exito.
+
+Paso 02.- Validacion de Headers del CSV
+	Los encabezados son válidos y están en el orden correcto.
+
+Paso 03 - Validacion de tipos de Dato
+	El archivo está correcto. No se encontraron errores.
+
+Paso 04 - Carga del CSV de la Historial de Demanda
+	Número de registros cargados: 491534
+
+Paso 05 - Mueve Archivo Cargado a Procesados
+	Se movio archivo sin errores.
+
+Paso 06 - Limpieza de registros vacios.
+	Cantidad de Registros Vacios que se eliminaron en 'historico_demanda': 0
+
+Paso 08 - Validacion de Integridad de los SKU.
+	Integridad de SKUs correcta.
+
+Paso 09 - Calcula rangos de fechas de la Historia
+	Termina la proceso de calculo de rangos de fechas dela Historia
+
+
+
+Terminan Validaciones y Carga de datos del Historico de Ventas
+

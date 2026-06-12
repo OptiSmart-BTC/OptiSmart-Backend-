@@ -1,0 +1,37 @@
+Carga de SKUs
+
+Inicio de ejecucion: 2026-06-10 22:34:49
+
+Validaciones y Carga de datos de SKU
+
+Paso 01 - Revision de Encoding del CSV
+	Validacion de Encoding del archivo sku.csv realizada con exito.
+
+Paso 02.- Validacion de Headers del CSV
+	Los encabezados son válidos y están en el orden correcto.
+
+Paso 03.- Validación de tipos de dato
+	El archivo está correcto. No se encontraron errores. Total de filas: 35241
+
+Paso 04 - Carga del CSV de SKU
+	Número de registros cargados: 35241
+
+Paso 05 - Mueve Archivo Cargado a Procesados
+	Se movio archivo sin errores
+
+Paso 06 - Limpieza de Filas Vacias
+	Registros Vacios Eliminados En 'SKU': 0
+Paso 07 - Cálculo de Niveles OA (con corrección de autoabastecidos)
+	Autoabastecimientos corregidos: 0
+	Niveles OA actualizados: 0
+	Archivo CSV generado: ../../LOL/csv/out/sku_con_niveles.csv
+
+Paso 08 - Actualización de la colección 'ubis_saved'
+	Ubicaciones insertadas en 'ubis_saved': 49
+	Ubicaciones actualizadas en 'ubis_saved': 0
+	Ubicaciones eliminadas de 'ubis_saved': 0
+
+
+
+Terminan Validaciones y Carga de datos de SKU
+
