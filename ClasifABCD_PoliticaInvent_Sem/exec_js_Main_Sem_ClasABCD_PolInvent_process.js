@@ -295,20 +295,39 @@ async function IniciaejecutarArchivos() {
       nombre: "CS00_limpiaTablasProcesos.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    /*
     {
       nombre: "CS01_Actualiza_HistDMD_Week_Year.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    */
+      {
+      nombre: "CS01.V2_Actualiza_HistDMD_Week_Year.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    
     {
       nombre: "CS02_Calcula_FechasHorizontes.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    /*
     {
       nombre: "CS03_AgrupaHistDMD_v2.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+    */
+    {
+      nombre: "CS03.V3_AgrupaHistDMD.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    /*
     {
       nombre: "CS04_Calcula_Demanda_Costo_v2.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    */
+       {
+      nombre: "CS04.V3_Calcula_Demanda_Costo.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
@@ -402,6 +421,12 @@ async function IniciaejecutarArchivos() {
     },
     //{ nombre: 'PS04_CalculaErrorCuadrado_HistDMD.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     //{ nombre: 'PS05_Calcula_Variabilidad_Demanda_Cantidad_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    /* 
+    {
+      nombre: "PS04.1_CalculaErrorCuadrado_Variabilidad_Demanda_Cantidad.js",
+      parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
+    },
+    */
     {
       nombre: "PS05.1_Calcula_DS.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,

@@ -4733,7 +4733,12 @@ app.post("/deleteColeccionesUbisYPolitica", async (req, res) => {
     const client = conex.getClient(); // ✅ obtenemos el cliente
     const db = client.db("btc_opti_" + DBName); // ✅ obtenemos la instancia correcta de la base de datos
 
-    const colecciones = ["ubis_saved", "politica_inventarios_01"];
+    const colecciones = [
+      "ubis_saved",
+      "politica_inventarios_01",
+      "ui_all_pol_inv",
+      "cambios_ubicaciones_temp",
+    ];
     const resultados = [];
 
     for (const nombre of colecciones) {
