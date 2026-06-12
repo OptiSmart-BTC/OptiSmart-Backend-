@@ -32,6 +32,14 @@ async function main() {
     const historiaCollection = database.collection('historico_demanda');
     const clasificacionCollection = database.collection('demanda_ordenada_desc_sem');
 
+    await Promise.all([
+      historiaCollection.createIndex({ SKU: 1 }, { name: 'SKU_1' }),
+      clasificacionCollection.createIndex(
+        { Producto: 1, Ubicacion: 1 },
+        { name: 'Producto_1_Ubicacion_1' }
+      )
+    ]);
+
     const skus = await skuCollection.find().toArray();
 
     for (const sku of skus) {
@@ -67,6 +75,7 @@ async function main() {
     writeToLog(`\tTermina el Proceso`);
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
+    process.exitCode = 1;
   } finally {
     await client.close();
   }

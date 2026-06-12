@@ -116,6 +116,7 @@ async function ejecutarYLog(comando) {
     writeToLog(`Finaliza: ${comando} - ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
   } catch (error) {
     writeToLog(` ERROR ejecutando ${comando}: ${error.message}`);
+    throw error;
   }
 }
 

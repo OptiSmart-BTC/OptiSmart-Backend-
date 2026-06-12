@@ -67,6 +67,7 @@ function ejecutarArchivos(archivos) {
   const proceso = exec(comando, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error al ejecutar el archivo ${archivo.nombre}:`, error);
+      process.exitCode = 1;
       return;
     }
 
@@ -74,6 +75,8 @@ function ejecutarArchivos(archivos) {
     //console.error(`Errores del archivo ${archivo.nombre}:`, stderr);
 
     if (stdout.includes('ERROR')) {
+      console.error(`Error en la ejecución del archivo ${archivo.nombre}.`);
+      process.exitCode = 1;
       //console.error(`Error en la ejecución del archivo ${archivo.nombre}. Deteniendo la ejecución de los archivos restantes.`);
       return;
     }

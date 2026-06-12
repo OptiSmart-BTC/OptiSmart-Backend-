@@ -2,7 +2,6 @@ const fs = require("fs");
 const MongoClient = require("mongodb").MongoClient;
 const conex = require("../Configuraciones/ConStrDB");
 const moment = require("moment");
-
 const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv.slice(2)[0];
@@ -18,8 +17,13 @@ const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent.log`;
 const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
+function writeToLog(message) {
+  fs.appendFileSync(logFile, message + "\n");
+}
+
 async function calcularCosto() {
   writeToLog(`\nPaso 19 - Transforamación de datos de salida a Costo`);
+  writeToLog(`\tColección base: ${collectionName}`);
   let client;
 
   try {
@@ -27,7 +31,6 @@ async function calcularCosto() {
     const db = client.db(dbName);
 
     const inventarios01Collection = db.collection(collectionName);
-    const skuCollection = db.collection("sku");
 
     const joinResult = await inventarios01Collection
       .aggregate([
@@ -45,7 +48,8 @@ async function calcularCosto() {
       .toArray();
 
     const Costo = joinResult.map((inventario) => {
-      const costounidad = inventario.skuData.Costo_Unidad || 0;
+      const costounidad = Number(inventario.skuData.Costo_Unidad) || 0;
+      const n = (v) => Number(v) || 0;
       return {
         Tipo_Calendario: "Dia",
         SKU: inventario.SKU,
@@ -57,13 +61,13 @@ async function calcularCosto() {
         Presentacion: inventario.Presentacion,
         Ubicacion: inventario.Ubicacion,
         Desc_Ubicacion: inventario.Desc_Ubicacion,
-        SS: inventario.SS_Cantidad * costounidad,
-        Demanda_LT: inventario.Demanda_LT * costounidad,
-        MOQ: inventario.MOQ * costounidad,
-        ROQ: inventario.ROQ * costounidad,
-        ROP: inventario.ROP * costounidad,
-        META: inventario.META * costounidad,
-        Inventario_Promedio: inventario.Inventario_Promedio * costounidad,
+        SS: n(inventario.SS_Cantidad) * costounidad,
+        Demanda_LT: n(inventario.Demanda_LT) * costounidad,
+        MOQ: n(inventario.MOQ) * costounidad,
+        ROQ: n(inventario.ROQ) * costounidad,
+        ROP: n(inventario.ROP) * costounidad,
+        META: n(inventario.META) * costounidad,
+        Inventario_Promedio: n(inventario.Inventario_Promedio) * costounidad,
       };
     });
 
@@ -71,6 +75,7 @@ async function calcularCosto() {
       ? "politica_inventarios_costo_montecarlo"
       : "politica_inventarios_costo";
 
+    writeToLog(`\tColección destino: ${costoTargetCollectionName}`);
     const CostoCollection = db.collection(costoTargetCollectionName);
     await CostoCollection.insertMany(Costo);
 
@@ -80,10 +85,6 @@ async function calcularCosto() {
   } finally {
     if (client) await client.close();
   }
-}
-
-function writeToLog(message) {
-  fs.appendFileSync(logFile, message + "\n");
 }
 
 calcularCosto();

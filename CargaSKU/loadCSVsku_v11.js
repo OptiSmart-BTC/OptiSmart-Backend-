@@ -37,23 +37,27 @@ async function insertCSVDataToMongoDB() {
     // Leer el archivo CSV y insertar los registros en MongoDB
     const results = [];
     fs.createReadStream(csvFilePath)
-      .pipe(csv())
+      .pipe(csv({
+        mapHeaders: ({ header }) => header.replace(/^\uFEFF/, '').trim()
+      }))
       .on('data', (data) => {
+        const producto = String(data.Producto ?? '').trim();
+        const ubicacion = String(data.Ubicacion ?? '').trim();
         const overrideMinPoliticaInventarios = data.Override_Min_Politica_Inventarios !== '' ? (isNaN(data.Override_Min_Politica_Inventarios) ? String(data.Override_Min_Politica_Inventarios) : Number(data.Override_Min_Politica_Inventarios)) : '';
         const overrideMaxPoliticaInventarios = data.Override_Max_Politica_Inventarios !== '' ? (isNaN(data.Override_Max_Politica_Inventarios) ? String(data.Override_Max_Politica_Inventarios) : Number(data.Override_Max_Politica_Inventarios)) : '';
         const transformedData = {
-          SKU: `${String(data.Producto)}@${String(data.Ubicacion)}`, 
-          Producto: String(data.Producto), 
+          SKU: `${producto}@${ubicacion}`,
+          Producto: producto,
           Desc_Producto: String(data.Desc_Producto) ?? ' ',
           Familia_Producto: data.Familia_Producto !== '' ? String(data.Familia_Producto) : 'DEFAULT',
           Categoria: data.Categoria !== '' ? String(data.Categoria) : 'DEFAULT',
           Segmentacion_Producto: data.Segmentacion_Producto !== '' ? String(data.Segmentacion_Producto) : 'DEFAULT',
-          Ubicacion: String(data.Ubicacion), 
+          Ubicacion: ubicacion,
           Desc_Ubicacion: String(data.Desc_Ubicacion) ?? ' ', 
           Origen_Abasto: data.Origen_Abasto || 'Default Value', // Asegúrate de proporcionar un valor predeterminado si es necesario
           Ignorar: data.Ignorar || 0,
           Cantidad_Demanda_Indirecta: parseFloat(data.Cantidad_Demanda_Indirecta) || 0, // Convierte a float y proporciona un valor predeterminado
-          Nivel_OA: data.Nivel_OA || '1', // Asume '1' como valor predeterminado si no se proporciona
+          Nivel_OA: [1, 2, 3].includes(Number(data.Nivel_OA)) ? Number(data.Nivel_OA) : 1,
           OverrideClasificacionABCD: (data.OverrideClasificacionABCD !== null && data.OverrideClasificacionABCD !== '' && data.OverrideClasificacionABCD !== ' ') ? String(data.OverrideClasificacionABCD) : '-',
           Override_Min_Politica_Inventarios: overrideMinPoliticaInventarios,
           Override_Max_Politica_Inventarios: overrideMaxPoliticaInventarios,
@@ -94,7 +98,8 @@ async function insertCSVDataToMongoDB() {
   } catch (error) {
 
     writeToLog(`Error: ${error}`);
-
+    console.error(error);
+    process.exitCode = 1;
   }
 }
 

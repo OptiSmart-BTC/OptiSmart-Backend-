@@ -2,9 +2,11 @@ const { exec } = require("child_process");
 const fs = require("fs");
 const moment = require("moment");
 const { decryptData } = require("./DeCriptaPassAppDb");
+const { MongoClient } = require("mongodb");
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const parametroUsuario = process.argv.slice(2)[0];
-const modoEjecucion = process.argv.slice(2)[1] || "completo"; // 'completo' o 'incremental'
+const modoEjecucion = process.argv.slice(2)[1] || "completo";
 
 const {
   GB_DBName,
@@ -22,24 +24,20 @@ const logFileName = "ClasABCD_PolInvent";
 const logFile = `../../${parametroFolder}/log/${logFileName}.log`;
 const logFolder = `../../${parametroFolder}/log/Log_historico`;
 
-// Verificar si el archivo de log ya existe
 if (fs.existsSync(logFile)) {
   const timestamp = moment().format("YYYYMMDD_HHmmss");
   const renamedLogFile = `../../${parametroFolder}/log/Log_historico/${logFileName}_${timestamp}.log`;
-
-  if (!fs.existsSync(logFolder)) {
-    fs.mkdirSync(logFolder);
-  }
-
-  fs.renameSync(logFile, `${renamedLogFile}`);
+  if (!fs.existsSync(logFolder)) fs.mkdirSync(logFolder);
+  fs.renameSync(logFile, renamedLogFile);
 }
 
-const { MongoClient } = require("mongodb");
-const { host, puerto, passadmin } = require("../Configuraciones/ConexionDB");
-
 let skuIgnorados = [];
+let snapshotIgnorados = [];
+let snapshotDemandaIgnorados = [];
 
-async function filtraSKU(passadminDeCripta) {
+async function snapshotDemandaABCD(passadminDeCripta, skuIgnorados) {
+  if (!skuIgnorados || skuIgnorados.length === 0) return [];
+
   const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
     passadminDeCripta
   )}@${host}:${puerto}/?authSource=admin`;
@@ -47,11 +45,77 @@ async function filtraSKU(passadminDeCripta) {
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
+
+  const tabla = db.collection("demanda_abcd_01");
+
+  const keys = skuIgnorados
+    .map((s) => `${s.Producto}@${s.Ubicacion}`)
+    .filter(Boolean);
+
+  // ✅ robusto: algunas veces esa tabla guarda SKU, otras Producto/Ubicacion
+  const data = await tabla
+    .find({
+      $or: [
+        { SKU: { $in: keys } },
+        { Codigo_SKU: { $in: keys } },
+        { Item: { $in: keys } },
+      ],
+    })
+    .toArray();
+
+  await client.close();
+  console.log(
+    `Snapshot demanda_abcd_01 creado: ${data.length} SKUs ignorados con Demanda_ABCD.`
+  );
+  return data;
+}
+
+// 🔹 Snapshot robusto desde ui_politica_inventarios
+async function snapshotClasificacion(passadminDeCripta, skuIgnorados) {
+  if (!skuIgnorados || skuIgnorados.length === 0) return [];
+
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+  const client = new MongoClient(uri);
+  await client.connect();
+  const db = client.db(dbName);
+  const tablaClasif = db.collection("ui_politica_inventarios");
+
+  const listaProductos = skuIgnorados.map((s) => s.Producto).filter(Boolean);
+  const listaCodigos = skuIgnorados
+    .map((s) => s.Codigo_SKU || s.SKU || s.Item)
+    .filter(Boolean);
+
+  const data = await tablaClasif
+    .find({
+      $or: [
+        { Producto: { $in: listaProductos } },
+        { Codigo_SKU: { $in: listaCodigos } },
+        { SKU: { $in: listaCodigos } },
+        { Item: { $in: listaCodigos } },
+      ],
+    })
+    .toArray();
+
+  await client.close();
+  console.log(
+    `Snapshot de clasificación creado: ${data.length} SKUs ignorados con datos C.`
+  );
+  return data;
+}
+
+// 🔹 Filtro de SKUs ignorados
+async function filtraSKU(passadminDeCripta) {
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+  const client = new MongoClient(uri);
+  await client.connect();
+  const db = client.db(dbName);
   const skuCollection = db.collection("sku");
 
   const todosSKU = await skuCollection.find().toArray();
-  console.log("TOTAL SKU en base:", todosSKU.length);
-
   skuIgnorados = todosSKU.filter(
     (sku) => sku.Ignorar === 1 || sku.Ignorar === "1"
   );
@@ -59,64 +123,129 @@ async function filtraSKU(passadminDeCripta) {
     (sku) => !(sku.Ignorar === 1 || sku.Ignorar === "1")
   );
 
-  console.log("SKUs ignorados:", skuIgnorados.length);
-  console.log("SKUs permitidos:", skuPermitidos.length);
-
-  try {
-    await skuCollection.deleteMany({});
-    console.log("Se eliminaron todos los SKU de la colección original.");
-    if (skuPermitidos.length > 0) {
-      await skuCollection.insertMany(skuPermitidos);
-      console.log("Se insertaron los SKU permitidos.");
-    } else {
-      console.log("No hay SKU permitidos que insertar.");
-    }
-  } catch (err) {
-    console.error("Error al borrar/insertar SKU:", err);
-  }
-
-  const totalFinal = await skuCollection.countDocuments();
-  console.log("SKUs en colección 'sku' al final del filtro:", totalFinal);
+  await skuCollection.deleteMany({});
+  if (skuPermitidos.length > 0) await skuCollection.insertMany(skuPermitidos);
   await client.close();
+
+  console.log(
+    "Filtrado de SKUs completado:",
+    skuIgnorados.length,
+    "ignorados."
+  );
 }
 
-async function reintegraIgnorados() {
+async function reintegraIgnorados(snapshotData = [], snapshotDemanda = []) {
   const passadminDeCripta = await getDecryptedPassadmin();
-  await filtraSKU(passadminDeCripta);
   const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
     passadminDeCripta
   )}@${host}:${puerto}/?authSource=admin`;
+
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
 
-  const colecciones = [
-    "ui_all_pol_inv",
-    "politicas_inventario_01",
-    "ui_pol_inv_costo",
-    "ui_pol_inv_dias_cobertura",
-    "ui_pol_inv_pallets",
-    "ui_pol_inv_uom",
-    "ui_politica_inventarios",
-  ];
+  // Construimos las llaves SKU correctas
+  const ignoredSkuKeys = skuIgnorados.map(
+    (sku) => `${sku.Producto}@${sku.Ubicacion}`
+  );
+
+  const colecciones = ["ui_all_pol_inv"];
 
   for (const nombreCol of colecciones) {
     const col = db.collection(nombreCol);
-    const actuales = await col.find().toArray();
-    const camposBase = actuales.length > 0 ? Object.keys(actuales[0]) : [];
-    const ejemploReferencia = actuales[0] || {};
 
+    // birrar los datos existentes de estos SKUs
+    await col.deleteMany({ SKU: { $in: ignoredSkuKeys } });
+
+    // insertar registros limpios
     const nuevos = skuIgnorados.map((sku) => {
-      const nuevo = {};
-      for (const campo of camposBase) {
-        if (sku.hasOwnProperty(campo)) {
-          nuevo[campo] = sku[campo];
-        } else {
-          const valorEjemplo = ejemploReferencia[campo];
-          nuevo[campo] = typeof valorEjemplo === "number" ? 0 : "NA";
-        }
-      }
-      return nuevo;
+      const key = `${sku.Producto}@${sku.Ubicacion}`;
+      const snap =
+        snapshotData.find(
+          (s) => s.SKU === key || s.Producto === sku.Producto
+        ) || {};
+      const snapDem =
+        snapshotDemanda.find(
+          (d) => d.SKU === key || d.Codigo_SKU === key || d.Item === key
+        ) || {};
+
+      return {
+        SKU: key,
+        Producto: sku.Producto,
+        Ubicacion: sku.Ubicacion,
+        Desc_Producto: sku.Desc_Producto || snap.Desc_Producto || "NA",
+        Familia_Producto: sku.Familia_Producto || snap.Familia_Producto || "NA",
+        Categoria: sku.Categoria || snap.Categoria || "NA",
+        Presentacion: sku.Presentacion || snap.Presentacion || "NA",
+        Ubicacion: sku.Ubicacion || snap.Ubicacion || "NA",
+        Desc_Ubicacion: sku.Desc_Ubicacion || snap.Desc_Ubicacion || "NA",
+        Clasificacion:
+          sku.Clasificacion_ABCD ||
+          snap.Clasificacion_ABCD ||
+          snapDem.Clasificacion_ABCD ||
+          "NA",
+        Nivel_Servicio: 0,
+        Valor_Z: 0,
+        UOM: "DEFAULT",
+        UOM_Base: sku.Presentacion || snap.Presentacion || "NA",
+        Unidades_Empaque: 0,
+        Demanda_Promedio_Diaria: 0,
+        Lead_Time_Abasto: 0,
+        Variabilidad_Demanda_Cantidad: 0,
+        DS_Demanda: 0,
+        Fill_Rate: 0,
+        Frecuencia_Revision_dias: 0,
+        Prom_LT: 0,
+        DS_LT: 0,
+        Override_SI_NO: "NO",
+        Override_Min_Politica_Inventarios: null,
+        Override_Max_Politica_Inventarios: null,
+        SS_Cantidad: 0,
+        Demanda_LT: 0,
+        MOQ: 0,
+        ROQ: 0,
+        ROP: 0,
+        META: 0,
+        Inventario_Promedio: 0,
+        Medida_Override: "NA",
+        Tipo_Override: "NA",
+        STAT_SS: 0,
+        Override_SS_Cantidad: 0,
+        Override_SS_Cantidad: 0,
+        DC_SS: 0,
+        DC_Demanda_LT: 0,
+        DC_MOQ: 0,
+        DC_ROQ: 0,
+        DC_ROP: 0,
+        DC_META: 0,
+        DC_Inventario_Promedio: 0,
+        DC_Vida_Util_Dias: 0,
+        DC_Tolerancia_Vida_Util_Dias: 0,
+        DC_ROP_Alto: 0,
+        DC_SobreInventario_Dias: 0,
+        P_SS: 0,
+        P_Demanda_LT: 0,
+        P_MOQ: 0,
+        P_ROQ: 0,
+        P_ROP: 0,
+        P_META: 0,
+        P_Inventario_Promedio: 0,
+        C_SS: 0,
+        C_Demanda_LT: 0,
+        C_MOQ: 0,
+        C_ROQ: 0,
+        C_ROP: 0,
+        C_META: 0,
+        C_Inventario_Promedio: 0,
+        U_SS: 0,
+        U_Demanda_LT: 0,
+        U_MOQ: 0,
+        U_ROQ: 0,
+        U_ROP: 0,
+        U_META: 0,
+        U_Inventario_Promedio: 0,
+        Ignorado: "SI",
+      };
     });
 
     if (nuevos.length > 0) {
@@ -125,27 +254,21 @@ async function reintegraIgnorados() {
     }
   }
 
+  // 🔁 Finalmente reintegramos tabla SKU original
   const skuCollection = db.collection("sku");
-  if (skuIgnorados.length > 0) {
-    const reformateados = skuIgnorados.map((sku) => {
-      const { _id, ...resto } = sku;
-      return { ...resto, Ignorar: 1 };
-    });
-
-    await skuCollection.insertMany(reformateados);
-    console.log(
-      `Reintegrados ${reformateados.length} SKU a colección 'sku' sin conflictos de _id`
-    );
-  }
+  await skuCollection.deleteMany({ Ignorar: 1 });
+  await skuCollection.insertMany(
+    skuIgnorados.map((s) => ({ ...s, Ignorar: 1 }))
+  );
 
   await client.close();
+  console.log("Reintegración final de ignorados completada sin duplicados.");
 }
 
 async function IniciaejecutarArchivos() {
   const passadminDeCripta = await getDecryptedPassadmin();
-  await filtraSKU(passadminDeCripta);
 
-  // Archivos de Clasificación ABCD (siempre se ejecutan)
+  // --- FASE 1: CLASIFICACIÓN ---
   const archivosClasificacion = [
     {
       nombre: "C00_limpiaTablasProcesos_v2.js",
@@ -183,9 +306,6 @@ async function IniciaejecutarArchivos() {
       nombre: "C06.1_Actualiza_Datos_SKU.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
-    // { nombre: 'C07_CalculaErrorCuadrado_HistDMD_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-    // { nombre: 'C08_Calcula_Variabilidad_Demanda_v3.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-    // { nombre: 'C09_Calcula_DS_Demanda.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     {
       nombre: "C09.1_Calcula_Desviacion_estandar.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -224,6 +344,41 @@ async function IniciaejecutarArchivos() {
     },
   ];
 
+  // --- FASE 1.5: obtener SKUs ignorados antes del filtro ---
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+  const clientTemp = new MongoClient(uri);
+  await clientTemp.connect();
+  const dbTemp = clientTemp.db(dbName);
+  skuIgnorados = await dbTemp.collection("sku").find({ Ignorar: 1 }).toArray();
+  await clientTemp.close();
+  console.log(
+    `Detectados ${skuIgnorados.length} SKUs ignorados para snapshot.`
+  );
+  writeToLog(`Detectados ${skuIgnorados.length} SKUs ignorados para snapshot.`);
+
+  // --- SNAPSHOT ---
+  snapshotIgnorados = await snapshotClasificacion(
+    passadminDeCripta,
+    skuIgnorados
+  );
+
+  snapshotDemandaIgnorados = await snapshotDemandaABCD(
+    passadminDeCripta,
+    skuIgnorados
+  );
+
+  // --- FASE 3: CLASIFICACIÓN ABCD ---
+  writeToLog(`Proceso de Clasificacion ABCD y Politicas de Inventario\n`);
+  writeToLog(
+    `Inicio de ejecucion: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n`
+  );
+
+  for (const archivo of archivosClasificacion) {
+    await ejecutarArchivo(archivo, passadminDeCripta);
+  }
+
   // Archivos de Políticas (modo completo)
   const archivosPoliticasCompleto = [
     {
@@ -246,8 +401,6 @@ async function IniciaejecutarArchivos() {
       nombre: "P03_Calcula_Demanda_Promedio_Diaria.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
-    //{ nombre: 'P04_CalculaErrorCuadrado_HistDMD.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-    //{ nombre: 'P05_Calcula_Variabilidad_Demanda_Cantidad.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     {
       nombre: "P05.1_Calcula_DS.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -268,7 +421,6 @@ async function IniciaejecutarArchivos() {
       nombre: "P09_Calcula_DS_LT.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
-    //{ nombre: 'P09.2_Calcula_DS_LT_v2.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     {
       nombre: "P09.1_Calcula_Stat_SS.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -333,7 +485,6 @@ async function IniciaejecutarArchivos() {
       nombre: "P21_UneTablas.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
-    //{ nombre: 'P22_Guarda_en_ubis_saved.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
   ];
 
   // Proceso incremental (solo identificación y procesamiento de cambios)
@@ -348,56 +499,38 @@ async function IniciaejecutarArchivos() {
     },
   ];
 
-  // Determinar qué archivos ejecutar
-  let archivosAEjecutar = [...archivosClasificacion];
+  console.log("Aplicando filtro de SKUs ignorados para políticas...");
+  await filtraSKU(passadminDeCripta);
 
+  // --- FASE 4: POLÍTICAS (según modo) ---
   if (modoEjecucion === "incremental") {
-    writeToLog(`Modo INCREMENTAL - Solo procesando cambios en ubicaciones`);
-    archivosAEjecutar = [...archivosAEjecutar, ...procesosIncrementales];
-  } else {
-    writeToLog(`Modo COMPLETO - Procesamiento completo de politicas`);
-    archivosAEjecutar = [...archivosAEjecutar, ...archivosPoliticasCompleto];
-  }
+    writeToLog(`\nModo INCREMENTAL - Solo procesando cambios en ubicaciones`);
+    console.log("Modo INCREMENTAL activado");
 
-  writeToLog(`Proceso de Clasificacion ABCD y Politicas de Inventario\n`);
-  writeToLog(
-    `Inicio de ejecucion: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n`
-  );
-
-  for (const archivo of archivosAEjecutar) {
-    const inicio = moment();
-    const comando = `node ${archivo.nombre} ${archivo.parametros}`;
-    console.log(`${archivo.nombre}`);
-
-    writeToLog(`\n------------------------------`);
-    writeToLog(
-      `Inicio de ${archivo.nombre}: ${inicio.format("YYYY-MM-DD HH:mm:ss")}`
-    );
-
-    try {
-      await ejecutarComando(comando);
-      const fin = moment();
-      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
-      writeToLog(
-        `Fin de ${archivo.nombre}: ${fin.format("YYYY-MM-DD HH:mm:ss")}`
-      );
-      writeToLog(`Duración: ${duracion} segundos`);
-    } catch (error) {
-      const fin = moment();
-      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
-      writeToLog(
-        `Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`
-      );
-
-      // En modo incremental, si hay error, cambiar a modo completo
-      if (modoEjecucion === "incremental") {
+    let errorIncremental = false;
+    for (const archivo of procesosIncrementales) {
+      try {
+        await ejecutarArchivo(archivo, passadminDeCripta);
+      } catch (error) {
+        errorIncremental = true;
         writeToLog(`Error en modo incremental, cambiando a modo completo...`);
-        // Ejecutar proceso completo como fallback
-        for (const archivoCompleto of archivosPoliticasCompleto) {
-          await ejecutarArchivo(archivoCompleto, passadminDeCripta);
-        }
+        console.log("Error en modo incremental, cambiando a modo completo...");
         break;
       }
+    }
+
+    // Si hay error en incremental, ejecutar completo como fallback
+    if (errorIncremental) {
+      writeToLog(`Ejecutando proceso completo como fallback...`);
+      for (const archivo of archivosPoliticasCompleto) {
+        await ejecutarArchivo(archivo, passadminDeCripta);
+      }
+    }
+  } else {
+    writeToLog(`\nModo COMPLETO - Procesamiento completo de politicas`);
+    console.log("Modo COMPLETO activado");
+    for (const archivo of archivosPoliticasCompleto) {
+      await ejecutarArchivo(archivo, passadminDeCripta);
     }
   }
 
@@ -406,12 +539,16 @@ async function IniciaejecutarArchivos() {
   writeToLog(
     `Termina el Proceso de Clasificacion ABCD y Politicas de Inventario: ${now_fin}\n`
   );
-  await reintegraIgnorados();
+
+  // --- FASE 5: REINTEGRACIÓN FINAL ---
+  await reintegraIgnorados(snapshotIgnorados, snapshotDemandaIgnorados);
 }
 
+// 🔹 Utilidades
 async function ejecutarArchivo(archivo, passadminDeCripta) {
   const inicio = moment();
   const comando = `node ${archivo.nombre} ${archivo.parametros}`;
+  console.log(`Ejecutando ${archivo.nombre}`);
 
   writeToLog(`\n------------------------------`);
   writeToLog(
@@ -426,25 +563,20 @@ async function ejecutarArchivo(archivo, passadminDeCripta) {
       `Fin de ${archivo.nombre}: ${fin.format("YYYY-MM-DD HH:mm:ss")}`
     );
     writeToLog(`Duración: ${duracion} segundos`);
-  } catch (error) {
+  } catch (err) {
     const fin = moment();
     const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
     writeToLog(
-      `Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`
+      `Error en ${archivo.nombre} tras ${duracion} segundos: ${err.message}`
     );
-    throw error;
+    console.error(`Error en ${archivo.nombre}:`, err.message);
+    throw err;
   }
 }
 
 function ejecutarComando(comando) {
   return new Promise((resolve, reject) => {
-    exec(comando, (error, stdout, stderr) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    });
+    exec(comando, (error) => (error ? reject(error) : resolve()));
   });
 }
 

@@ -1,108 +1,98 @@
-const fs = require('fs');
-const { MongoClient } = require('mongodb');
-const conex= require('../Configuraciones/ConStrDB');
-const moment = require('moment');
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
-const { host, puerto} = require('../Configuraciones/ConexionDB');
+const dbName = process.argv[2];
+const DBUser = process.argv[3];
+const DBPassword = process.argv[4];
+const collectionName = process.argv[5] || "politica_inventarios_01_sem";
 
-const dbName = process.argv.slice(2)[0];
-const DBUser = process.argv.slice(2)[1];
-const DBPassword = process.argv.slice(2)[2];
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
-//const uri = `mongodb://${host}:${puerto}/${dbName}`;
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-//const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+const parametroFolder = dbName
+  .substring(dbName.lastIndexOf("_") + 1)
+  .toUpperCase();
+const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
-const parametro = dbName;
-const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
-const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`; 
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
+function writeToLog(message) {
+  try {
+    fs.appendFileSync(logFile, message + "\n");
+  } catch (e) {
+    console.error(`[LOG FALLÓ] ${message}`);
+  }
+}
 
-  // Configuración de conexión a la base de datos MongoDB
-  //const uri = 'mongodb://127.0.0.1:27017'; // Cambia esto si tu MongoDB se encuentra en un servidor diferente
-  //const dbName = 'btc_opti_a001';
+function fmt4(n) {
+  const v = Number(n);
+  if (!Number.isNaN(v)) {
+    return v.toLocaleString(undefined, {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    });
+  }
+  return 0;
+}
+function fmt0(n) {
+  const v = Number(n);
+  if (!Number.isNaN(v)) {
+    return v.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  }
+  return 0;
+}
 
 async function copiarDatos() {
-  //writeToLog('------------------------------------------------------------------------------');
   writeToLog(`\nPaso 16 - Formateo de las Tablas Finales para mostrar en UI`);
+  writeToLog(`\tColección base: ${collectionName}`);
 
-  const client = new MongoClient(mongoUri);
-
+  let client;
   try {
-    await client.connect();
-
+    client = await MongoClient.connect(mongoUri);
     const db = client.db(dbName);
-    const collection = db.collection('politica_inventarios_01_sem');
+    const base = db.collection(collectionName);
 
-    const finalCollection = db.collection('ui_sem_politica_inventarios');
-    await finalCollection.deleteMany({});
+    // Igual criterio que P16, pero con sufijo _sem obligado para semanal
+    const finalCollectionName = collectionName.includes("montecarlo")
+      ? "ui_politica_inventarios_montecarlo_sem"
+      : "ui_politica_inventarios_sem";
 
+    writeToLog(`\tColección final: ${finalCollectionName}`);
+    const finalCol = db.collection(finalCollectionName);
+    await finalCol.deleteMany({});
 
-    const datos = await collection.find().toArray();
+    const datos = await base.find().toArray();
 
+    // Campos SEM: Demanda_Promedio_Semanal, etc. (NO cambiar nombres de campo)
+    const datosFormateados = datos.map((d) => ({
+      ...d,
+      Valor_Z: fmt4(d.Valor_Z),
+      Demanda_Promedio_Semanal: fmt4(d.Demanda_Promedio_Semanal),
+      Variabilidad_Demanda_Cantidad: fmt4(d.Variabilidad_Demanda_Cantidad),
+      DS_Demanda: fmt4(d.DS_Demanda),
+      Prom_LT: fmt4(d.Prom_LT),
+      DS_LT: fmt4(d.DS_LT),
+      SS_Cantidad: fmt4(d.SS_Cantidad),
+      Demanda_LT: fmt0(d.Demanda_LT),
+      MOQ: fmt0(d.MOQ),
+      ROQ: fmt0(d.ROQ),
+      ROP: fmt0(d.ROP),
+      META: fmt4(d.META),
+      Inventario_Promedio: fmt0(d.Inventario_Promedio),
+      STAT_SS: fmt0(d.STAT_SS),
+    }));
 
-    const datosFormateados = datos.map((dato) => {
-      return {
-        ...dato,
-        Valor_Z: formatearNumero(dato.Valor_Z),
-        Demanda_Promedio_Semanal: formatearNumero(dato.Demanda_Promedio_Semanal),
-        Variabilidad_Demanda_Cantidad: formatearNumero(dato.Variabilidad_Demanda_Cantidad),
-        DS_Demanda: formatearNumero(dato.DS_Demanda),
-        Prom_LT: formatearNumero(dato.Prom_LT),
-        DS_LT: formatearNumero(dato.DS_LT),
-        SS_Cantidad: formatearNumero(dato.SS_Cantidad),
-        Demanda_LT: formatearNumero2(dato.Demanda_LT),
-        MOQ: formatearNumero2(dato.MOQ),
-        ROQ: formatearNumero2(dato.ROQ),
-        ROP: formatearNumero2(dato.ROP),
-        META: formatearNumero(dato.META),
-        Inventario_Promedio: formatearNumero2(dato.Inventario_Promedio),
-        STAT_SS: formatearNumero2(dato.STAT_SS)
-      };
-    });
-
-    // Guardar los datos en la tabla demanda_abcd_ui
-    await finalCollection.insertMany(datosFormateados);
-
-    //console.log('Los datos se han copiado correctamente.');
-    //writeToLog(`${now} - Ejecucion exitosa`);
+    await finalCol.insertMany(datosFormateados);
     writeToLog(`\tTermina el Formateo de las Tablas Finales`);
   } catch (error) {
-    //console.error('Error al copiar los datos:', error);
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
-    // Cerrar la conexión a la base de datos
-    client.close();
+    if (client) await client.close();
   }
 }
 
-// Función para formatear un número y separar los millares por coma y redondear decimales a 4 dígitos
-function formatearNumero(numero) {
-  if (typeof numero === 'number') {
-    return numero.toLocaleString(undefined, {
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4
-    });
-  }
-  return numero;
-}
-
-
-
-function formatearNumero2(numero) {
-    if (typeof numero === 'number') {
-      return numero.toLocaleString(undefined, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      });
-    }
-    return numero;
-  }
-
-  function writeToLog(message) {
-    fs.appendFileSync(logFile, message + '\n');
-  }
-  
-// Llamar a la función para ejecutarla
 copiarDatos();

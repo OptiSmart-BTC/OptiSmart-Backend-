@@ -27,7 +27,9 @@ async function actualizarDatos() {
     const db = client.db(dbName);
     const collection = db.collection(collectionName);
 
-    const filter = nivelFiltrado !== null ? { Nivel_OA: nivelFiltrado } : {};
+    const filter = nivelFiltrado !== null
+      ? { Nivel_OA: { $in: [nivelFiltrado, String(nivelFiltrado)] } }
+      : {};
     const documentos = await collection.find(filter).toArray();
 
     const updates = [];
@@ -70,6 +72,7 @@ async function actualizarDatos() {
     writeToLog(`\t Cantidad y Plan_Reposicion_Cantidad calculados en ${updates.length} documentos para Nivel ${nivelFiltrado}`);
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
+    process.exitCode = 1;
   } finally {
     if (client) client.close();
   }

@@ -15,7 +15,7 @@ const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
 const now = moment().format('YYYY-MM-DD HH:mm:ss');
 
-const collection1 = 'plan_reposicion_01_se,';
+const collection1 = 'plan_reposicion_01_sem';
 const collection2 = 'sku';
 
 async function actualizarDatos() {
@@ -29,7 +29,9 @@ async function actualizarDatos() {
     const col1 = db.collection(collection1);
     const col2 = db.collection(collection2);
 
-    const filtro = nivelFiltrado !== null ? { Nivel_OA: nivelFiltrado } : {};
+    const filtro = nivelFiltrado !== null
+      ? { Nivel_OA: { $in: [nivelFiltrado, String(nivelFiltrado)] } }
+      : {};
     const docs = await col1.find(filtro).toArray();
 
     const skuDocs = await col2.find({}).toArray();
@@ -60,6 +62,7 @@ async function actualizarDatos() {
 
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
+    process.exitCode = 1;
   } finally {
     if (client) client.close();
   }

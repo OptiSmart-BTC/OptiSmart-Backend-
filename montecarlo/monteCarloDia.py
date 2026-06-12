@@ -53,7 +53,7 @@ def simulacion_monte_carlo(demandas, nivel_servicio, lead_time, num_sim):
     return demnda_lead_time_avg, nivel_servicio_stock, safety_stock
 
 
-# Función principal que combina todas las anteriores
+# Función principal que combina todas las an    teriores
 def calcular_demanda_y_simulacion_diaria(coleccion, sku, nivel_servicio, lead_time, num_sim, fecha_inicio, fecha_fin):
     data_sku = cargar_datos(coleccion, sku, fecha_inicio, fecha_fin)
     demanda_semanal = generar_demanda_diaria(data_sku, fecha_inicio, fecha_fin)

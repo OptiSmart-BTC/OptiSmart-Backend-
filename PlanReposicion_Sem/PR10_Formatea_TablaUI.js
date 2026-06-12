@@ -1,21 +1,21 @@
 // PR10_Formatea_TablaUI.js
-const fs = require('fs');
-const { MongoClient } = require('mongodb');
-const conex = require('../Configuraciones/ConStrDB');
-const moment = require('moment');
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
 
-const { host, puerto} = require('../Configuraciones/ConexionDB');
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
 
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`; 
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
+const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
 async function copiarDatos() {
   writeToLog(`\nPaso 10 - Formateo de las Tablas Finales para mostrar en UI`);
@@ -26,8 +26,36 @@ async function copiarDatos() {
     await client.connect();
 
     const db = client.db(dbName);
-    const collection = db.collection('plan_reposicion_01_sem');
-    const finalCollection = db.collection('ui_sem_plan_reposicion');
+    const collection = db.collection("plan_reposicion_01_sem");
+    const finalCollection = db.collection("ui_sem_plan_reposicion");
+    // --- obtener SKUs ignorados desde la salida final de políticas ---
+    const posiblesPolCols = [
+      "ui_all_pol_inv",
+      "ui_all_pol_inv_montecarlo",
+      "ui_all_pol_inv_sem",
+      "ui_all_pol_inv_montecarlo_sem",
+    ];
+
+    let polCol = null;
+    for (const name of posiblesPolCols) {
+      const exists = await db.listCollections({ name }).hasNext();
+      if (exists) {
+        polCol = db.collection(name);
+        break;
+      }
+    }
+
+    const ignoradosSet = new Set();
+    if (polCol) {
+      const ignorados = await polCol
+        .find({ Ignorado: "SI" }, { projection: { SKU: 1 } })
+        .toArray();
+
+      for (const d of ignorados) {
+        if (d.SKU) ignoradosSet.add(String(d.SKU));
+      }
+    }
+
     await finalCollection.deleteMany({});
 
     const datos = await collection.find().toArray();
@@ -44,23 +72,36 @@ async function copiarDatos() {
         Ubicacion: dato.Ubicacion,
         Desc_Ubicacion: dato.Desc_Ubicacion,
         UOM_Base: dato.UOM_Base,
-        Inventario_Disponible: formatearNumero2(dato.Inventario_Disponible ?? 0),
+        Inventario_Disponible: formatearNumero2(
+          dato.Inventario_Disponible ?? 0
+        ),
         Cantidad_Transito: formatearNumero2(dato.Cantidad_Transito ?? 0),
-        Cantidad_Confirmada_Total: formatearNumero2(dato.Cantidad_Confirmada_Total ?? 0),
+        Cantidad_Confirmada_Total: formatearNumero2(
+          dato.Cantidad_Confirmada_Total ?? 0
+        ),
         SS_Cantidad: formatearNumero(dato.SS_Cantidad ?? 0),
         ROP: formatearNumero(dato.ROP ?? 0),
         META: formatearNumero(dato.META ?? 0),
-        'Cantidad Demanda Indirecta': formatearNumero2(dato.Cantidad_Demanda_Indirecta ?? 0), // renombrada
+        "Cantidad Demanda Indirecta": formatearNumero2(
+          dato.Cantidad_Demanda_Indirecta ?? 0
+        ), // renombrada
         Requiere_Reposicion: dato.Requiere_Reposicion,
         Cantidad_Reponer: formatearNumero(dato.Cantidad_Reponer ?? 0),
         MOQ: formatearNumero2(dato.MOQ ?? 0),
-        Plan_Reposicion_Cantidad: formatearNumero2(dato.Plan_Reposicion_Cantidad ?? 0),
-        Plan_Reposicion_Pallets: formatearNumero2(dato.Plan_Reposicion_Pallets ?? 0),
+        Plan_Reposicion_Cantidad: formatearNumero2(
+          dato.Plan_Reposicion_Cantidad ?? 0
+        ),
+        Plan_Reposicion_Pallets: formatearNumero2(
+          dato.Plan_Reposicion_Pallets ?? 0
+        ),
         Plan_Firme_Pallets: formatearNumero2(dato.Plan_Firme_Pallets ?? 0),
-        Plan_Reposicion_Costo: formatearNumero2(dato.Plan_Reposicion_Costo ?? 0),
+        Plan_Reposicion_Costo: formatearNumero2(
+          dato.Plan_Reposicion_Costo ?? 0
+        ),
         Costo_Unidad: formatearNumero(dato.Costo_Unidad ?? 0),
         Origen_Abasto: dato.Origen_Abasto,
-        Nivel_OA: dato.Nivel_OA
+        Nivel_OA: dato.Nivel_OA,
+        Ignorado: ignoradosSet.has(String(dato.SKU)) ? "SI" : "",
       };
 
       return formateado;
@@ -78,19 +119,19 @@ async function copiarDatos() {
 function formatearNumero(numero) {
   return Number(numero).toLocaleString(undefined, {
     minimumFractionDigits: 4,
-    maximumFractionDigits: 4
+    maximumFractionDigits: 4,
   });
 }
 
 function formatearNumero2(numero) {
   return Number(numero).toLocaleString(undefined, {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 0
+    maximumFractionDigits: 0,
   });
 }
 
 function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
+  fs.appendFileSync(logFile, message + "\n");
 }
 
 copiarDatos();

@@ -40,6 +40,9 @@ async function main() {
     const historicoDemandaCollection = database.collection('historico_demanda');
     const calendarCollection = database.collection('Calendar');
 
+    // Evita un escaneo completo de Calendar por cada fila del histórico.
+    await calendarCollection.createIndex({ Fecha: 1 });
+
     const pipeline = [
       {
         $lookup: {
@@ -59,11 +62,7 @@ async function main() {
           Week_Year: {         
             $concat: [
             { $toString: '$calendarData.Week' },
-<<<<<<< HEAD
-            '_',
-=======
             '_W',
->>>>>>> origin/test
             { $toString: '$calendarData.Year' },
           ],},
         },
@@ -80,7 +79,9 @@ async function main() {
       },
     ];
 
-    const result = await historicoDemandaCollection.aggregate(pipeline).toArray();
+    await historicoDemandaCollection
+      .aggregate(pipeline, { allowDiskUse: true })
+      .toArray();
 
 
 

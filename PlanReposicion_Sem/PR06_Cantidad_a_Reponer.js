@@ -25,7 +25,10 @@ async function actualizarDatos() {
     const db = client.db(dbName);
     const collection = db.collection('plan_reposicion_01_sem');
 
-    const documentos = await collection.find({ Nivel_OA: nivelFiltrado }).toArray();
+    const filtro = nivelFiltrado !== null
+      ? { Nivel_OA: { $in: [nivelFiltrado, String(nivelFiltrado)] } }
+      : {};
+    const documentos = await collection.find(filtro).toArray();
 
     const updates = documentos.map(doc => {
       const requiereRepos = doc.Requiere_Reposicion === "Si";
@@ -34,17 +37,15 @@ async function actualizarDatos() {
       const trans = doc.Cantidad_Transito || 0;
       const confirmada = doc.Cantidad_Confirmada_Total || 0;
       const meta = doc.META || 0;
-      const demandaInd = (nivelFiltrado >= 2) ? (doc["Cantidad Demanda Indirecta"] || 0) : 0;
+      const demandaInd = (nivelFiltrado >= 2)
+        ? (doc["Cantidad Demanda Indirecta"] || doc.Cantidad_Demanda_Indirecta || 0)
+        : 0;
 
       const calculo = requiereRepos
         ? Math.max(0, Math.round(meta + confirmada + demandaInd - inv - trans))
         : 0;
 
       // 🟡 Log de depuración
-      if (requiereRepos) {
-        console.log(`[DEPURACIÓN] SKU=${doc.SKU}, Nivel=${nivelFiltrado}, META=${meta}, Confirmada=${confirmada}, DemandaInd=${demandaInd}, Inv=${inv}, Trans=${trans} => Reponer=${calculo}`);
-      }
-
       return {
         updateOne: {
           filter: { _id: doc._id },
@@ -61,6 +62,7 @@ async function actualizarDatos() {
 
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
+    process.exitCode = 1;
   } finally {
     if (client) client.close();
   }

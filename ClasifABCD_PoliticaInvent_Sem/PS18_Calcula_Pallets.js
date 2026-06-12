@@ -1,64 +1,56 @@
-const fs = require('fs'); 
-const MongoClient = require('mongodb').MongoClient;
-const conex= require('../Configuraciones/ConStrDB');
-const moment = require('moment');
-
-const { host, puerto} = require('../Configuraciones/ConexionDB');
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
+const collectionName =
+  process.argv.slice(2)[3] || "politica_inventarios_01_sem";
 
-//const uri = `mongodb://${host}:${puerto}/${dbName}`;
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
-//const uri = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`; 
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
+const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
-// Configurar la conexión a MongoDB
-//const uri = 'mongodb://127.0.0.1:27017'; // Cambia esta URL si tu servidor MongoDB está en otro lugar
-//const dbName = 'btc_opti_a001';
+function writeToLog(message) {
+  fs.appendFileSync(logFile, message + "\n");
+}
 
 async function calcularPallets() {
-  //writeToLog('------------------------------------------------------------------------------');
   writeToLog(`\nPaso 18 - Transforamación de datos de salida a pallets`);
+  writeToLog(`\tColección base: ${collectionName}`);
 
   try {
-    // Conectar a la base de datos
     const client = await MongoClient.connect(mongoUri);
     const db = client.db(dbName);
 
-    // Obtener los documentos de la colección política_inventarios_01
-    const inventarios01Collection = db.collection('politica_inventarios_01_sem');
-    const skuCollection = db.collection('sku');
-    
-    // Realizar join entre política_inventarios_01 y sku utilizando el campo SKU
-    const joinResult = await inventarios01Collection.aggregate([
-      {
-        $lookup: {
-          from: 'sku',
-          localField: 'SKU',
-          foreignField: 'SKU',
-          as: 'skuData'
-        }
-      },
-      {
-        $unwind: "$skuData"
-      },
-      {
-        $sort: { "Ubicacion": 1, "Producto": 1 }
-      }
-    ]).toArray();
+    const inventarios01Collection = db.collection(collectionName);
 
-    // Calcular los valores y crear los documentos para la colección política_inventarios_pallets
+    const joinResult = await inventarios01Collection
+      .aggregate([
+        {
+          $lookup: {
+            from: "sku",
+            localField: "SKU",
+            foreignField: "SKU",
+            as: "skuData",
+          },
+        },
+        { $unwind: "$skuData" },
+        { $sort: { Ubicacion: 1, Producto: 1 } },
+      ])
+      .toArray();
+
     const pallets = joinResult.map((inventario) => {
-      const unidadesPallet = inventario.skuData.Unidades_Pallet;
+      const unidadesPallet = Number(inventario.skuData.Unidades_Pallet) || 1;
       return {
-        Tipo_Calendario:"Sem",
+        Tipo_Calendario: "Sem",
         SKU: inventario.SKU,
         Producto: inventario.Producto,
         Desc_Producto: inventario.Desc_Producto,
@@ -68,36 +60,33 @@ async function calcularPallets() {
         Presentacion: inventario.Presentacion,
         Ubicacion: inventario.Ubicacion,
         Desc_Ubicacion: inventario.Desc_Ubicacion,
-        SS: Math.ceil(inventario.SS_Cantidad / unidadesPallet),
-        Demanda_LT: Math.ceil(inventario.Demanda_LT / unidadesPallet),
-        MOQ: Math.ceil(inventario.MOQ / unidadesPallet),
-        ROQ: Math.ceil(inventario.ROQ / unidadesPallet),
-        ROP: Math.ceil(inventario.ROP / unidadesPallet),
-        META: Math.ceil(inventario.META / unidadesPallet),
-        Inventario_Promedio: Math.ceil(inventario.Inventario_Promedio / unidadesPallet)
+        SS: Math.ceil((Number(inventario.SS_Cantidad) || 0) / unidadesPallet),
+        Demanda_LT: Math.ceil(
+          (Number(inventario.Demanda_LT) || 0) / unidadesPallet
+        ),
+        MOQ: Math.ceil((Number(inventario.MOQ) || 0) / unidadesPallet),
+        ROQ: Math.ceil((Number(inventario.ROQ) || 0) / unidadesPallet),
+        ROP: Math.ceil((Number(inventario.ROP) || 0) / unidadesPallet),
+        META: Math.ceil((Number(inventario.META) || 0) / unidadesPallet),
+        Inventario_Promedio: Math.ceil(
+          (Number(inventario.Inventario_Promedio) || 0) / unidadesPallet
+        ),
       };
     });
 
-    // Insertar los documentos en la colección política_inventarios_pallets
-    //const palletsCollection = db.collection('política_inventarios_pallets');
-    const palletsCollection = db.collection('ui_sem_pol_inv_pallets');
+    const outName = collectionName.includes("montecarlo")
+      ? "ui_pol_inv_pallets_montecarlo_sem"
+      : "ui_pol_inv_pallets_sem";
+
+    writeToLog(`\tColección salida: ${outName}`);
+    const palletsCollection = db.collection(outName);
     await palletsCollection.insertMany(pallets);
 
-    //console.log('Los datos de pallets se han calculado y guardado correctamente.');
-
-    //writeToLog(`${now} - Ejecucion exitosa`);
     writeToLog(`\tTermina la Transforamación de datos de salida a pallets`);
     client.close();
   } catch (error) {
-    //console.error('Ocurrió un error:', error);
     writeToLog(`${now} - [ERROR] ${error.message}`);
-    client.close();
-  } 
+  }
 }
 
-function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
-}
-
-// Ejecutar la función principal
 calcularPallets();

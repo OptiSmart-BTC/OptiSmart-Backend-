@@ -33,15 +33,15 @@ async function IniciaejecutarArchivos() {
     { nombre: 'PR00_limpia_PlanRep.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR01_PlanRep_InvDispo.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR1.1_Actualiza_Datos_SKU.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-    //{ nombre: 'Copia_NivelOA.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR02_PlanRep_InvTrans.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR03_CantidadConfirmada_Total.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR04_PolInv_SS_Cantidad.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-   // { nombre: 'PR05_RequiereReposicion.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
-   // { nombre: 'PR06_Cantidad_a_Reponer.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'PR05_RequiereReposicion.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'PR06_Cantidad_a_Reponer.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     
     { nombre: 'PR07_SKU_MOQ.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'Ejecuta_PlanPorNivel.js', parametros: `${DBName} ${DBUser} ${passadminDeCripta}` },
+    { nombre: 'PR09.3_Valida_Costos.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     
     { nombre: 'PR11_Calculo_Indicadores.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
     { nombre: 'PR12_Alerta_Excedente.js', parametros: `${dbName} ${DBUser} ${passadminDeCripta}` },
@@ -72,6 +72,7 @@ async function IniciaejecutarArchivos() {
     } catch (error) {
       const now_error = moment().format('YYYY-MM-DD HH:mm:ss');
       writeToLog(`${now_error} - Error al ejecutar el archivo ${archivo.nombre}: ${error}`);
+      throw error;
     }
   }
 

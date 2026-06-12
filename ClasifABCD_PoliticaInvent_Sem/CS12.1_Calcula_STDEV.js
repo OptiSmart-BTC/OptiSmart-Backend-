@@ -1,4 +1,3 @@
-// CS10_Calcula_Desviacion_STD_Demanda_Costos.js
 const fs = require('fs');
 const { MongoClient } = require('mongodb');
 const conex = require('../Configuraciones/ConStrDB');
@@ -12,10 +11,9 @@ const DBUser = process.argv.slice(2)[1];
 const DBPassword = process.argv.slice(2)[2];
 
 const parametro = dbName;
-const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
+const parte = parametro.substring(parametro.lastIndexOf('_') + 1);
 const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/ClasABCD_PolInvent_Sem.log`;
-
 const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
 function writeToLog(message) {
@@ -23,76 +21,107 @@ function writeToLog(message) {
 }
 
 async function calcularDesviacionEstandar() {
-  const now = moment().format('YYYY-MM-DD HH:mm:ss');
-  writeToLog(`\nPaso 10 - Calculo STDEV Demanda y STDEV Costo`);
+  writeToLog('\nPaso 10 - Calculo STDEV Demanda y STDEV Costo');
 
   const client = new MongoClient(mongoUri);
-  await client.connect();
-  const db = client.db(dbName);
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const histColl = db.collection('historico_demanda_sem');
+    const abcdColl = db.collection('demanda_abcd_01_sem');
+    const skuColl = db.collection('sku');
 
-  const histColl = db.collection('historico_demanda_sem');
-  const abcdColl = db.collection('demanda_abcd_01_sem');
-  const skuColl = db.collection('sku');
+    await Promise.all([
+      skuColl.createIndex(
+        { Producto: 1, Ubicacion: 1 },
+        { name: 'Producto_1_Ubicacion_1' }
+      ),
+      abcdColl.createIndex(
+        { Producto: 1, Ubicacion: 1 },
+        { name: 'Producto_1_Ubicacion_1' }
+      )
+    ]);
 
-  // Agrupar por Producto + Ubicacion y Week_Year
-  const registros = await histColl.aggregate([
-    {
-      $group: {
-        _id: {
-          Producto: "$Producto",
-          Ubicacion: "$Ubicacion",
-          Week_Year: "$Week_Year"
-        },
-        Cantidad_Sem: { $sum: "$Cantidad_Sem" }
+    const registros = await histColl.aggregate([
+      {
+        $group: {
+          _id: {
+            Producto: '$Producto',
+            Ubicacion: '$Ubicacion',
+            Week_Year: '$Week_Year'
+          },
+          Cantidad_Sem: { $sum: '$Cantidad_Sem' }
+        }
+      }
+    ], { allowDiskUse: true }).toArray();
+
+    const semanasUnicas = [...new Set(
+      registros.map(registro => registro._id.Week_Year)
+    )];
+    const datosAgrupados = new Map();
+
+    for (const registro of registros) {
+      const clave = `${registro._id.Producto}@${registro._id.Ubicacion}`;
+      if (!datosAgrupados.has(clave)) {
+        datosAgrupados.set(clave, new Map());
+      }
+      datosAgrupados
+        .get(clave)
+        .set(registro._id.Week_Year, registro.Cantidad_Sem);
+    }
+
+    const skuDocs = await skuColl.find(
+      {},
+      { projection: { Producto: 1, Ubicacion: 1, Costo_Unidad: 1 } }
+    ).toArray();
+    const costosPorSKU = new Map(
+      skuDocs.map(sku => [
+        `${sku.Producto}@${sku.Ubicacion}`,
+        sku.Costo_Unidad || 0
+      ])
+    );
+
+    const operaciones = [];
+    for (const [clave, semanas] of datosAgrupados) {
+      const [producto, ubicacion] = clave.split('@');
+      const vectorCantidad = semanasUnicas.map(
+        semana => semanas.get(semana) || 0
+      );
+      const costo = costosPorSKU.get(clave) || 0;
+      const vectorCosto = vectorCantidad.map(valor => valor * costo);
+
+      operaciones.push({
+        updateOne: {
+          filter: { Producto: producto, Ubicacion: ubicacion },
+          update: {
+            $set: {
+              STDEV_Demanda: math.std(vectorCantidad, 'uncorrected'),
+              STDEV_Costo: math.std(vectorCosto, 'uncorrected')
+            }
+          }
+        }
+      });
+
+      if (operaciones.length === 1000) {
+        await abcdColl.bulkWrite(operaciones, { ordered: false });
+        operaciones.length = 0;
       }
     }
-  ]).toArray();
 
-  // Agrupar por clave (Producto+Ubicacion)
-  const datosAgrupados = {};
-  for (const r of registros) {
-    const clave = `${r._id.Producto}@${r._id.Ubicacion}`;
-    if (!datosAgrupados[clave]) datosAgrupados[clave] = [];
-    datosAgrupados[clave].push({
-      week: r._id.Week_Year,
-      cantidad: r.Cantidad_Sem
-    });
+    if (operaciones.length > 0) {
+      await abcdColl.bulkWrite(operaciones, { ordered: false });
+    }
+
+    writeToLog('\tTermina el Calculo STDEV Demanda y STDEV Costo');
+  } catch (error) {
+    writeToLog(`Error: ${error}`);
+    process.exitCode = 1;
+  } finally {
+    await client.close();
   }
-
-  for (const clave in datosAgrupados) {
-    const [producto, ubicacion] = clave.split("@");
-    const semanas = datosAgrupados[clave];
-
-    // Obtener todas las semanas únicas del histórico para esta ejecución
-    const semanasUnicas = [...new Set(registros.map(r => r._id.Week_Year))];
-
-    // Construir vector con ceros donde no haya datos
-    const vectorCantidad = semanasUnicas.map(sem => {
-      const match = semanas.find(s => s.week === sem);
-      return match ? match.cantidad : 0;
-    });
-
-    // Obtener costo unidad
-    const skuData = await skuColl.findOne({ Producto: producto, Ubicacion: ubicacion });
-    const costo = skuData?.Costo_Unidad || 0;
-
-    const vectorCosto = vectorCantidad.map(val => val * costo);
-
-    const stdevCantidad = math.std(vectorCantidad, 'uncorrected');
-    const stdevCosto = math.std(vectorCosto, 'uncorrected');
-
-    // Actualizar en demanda_abcd_01_sem
-    await abcdColl.updateOne(
-      { Producto: producto, Ubicacion: ubicacion },
-      { $set: {
-          STDEV_Demanda: stdevCantidad,
-          STDEV_Costo: stdevCosto
-        } }
-    );
-  }
-
-  writeToLog(`\tTermina el Calculo STDEV Demanda y STDEV Costo`);
-  await client.close();
 }
 
-calcularDesviacionEstandar().catch(error => writeToLog(`Error: ${error}`));
+calcularDesviacionEstandar().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

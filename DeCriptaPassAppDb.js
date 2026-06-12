@@ -1,42 +1,31 @@
-const { spawn } = require('child_process');
+const crypto = require("crypto");
 
-function decryptData(dataToDeEncrypt) {
-  return new Promise((resolve, reject) => {
-    const javaProcess = spawn("java", ['DeCriptaUtil', dataToDeEncrypt]);
-    //const javaProcess = spawn("C:/Program Files/Java/jdk-20/bin/java", ['DeCriptaUtil', dataToDeEncrypt]);
-    let decryptedData = '';
+async function decryptData(dataToDecrypt) {
+  if (!dataToDecrypt) {
+    throw new Error("No se proporcionaron datos para desencriptar.");
+  }
 
-    javaProcess.stdout.on('data', (data) => {
-      const output = data.toString().trim();
-      if (output.startsWith('Datos desencriptados:')) {
-        decryptedData = output.split(':')[1].trim();
-      }
-    });
+  const decipher = crypto.createDecipheriv(
+    "aes-128-ecb",
+    Buffer.from("0123456789ABCDEF", "utf8"),
+    null
+  );
+  decipher.setAutoPadding(true);
 
-    javaProcess.stderr.on('data', (data) => {
-      reject(data.toString());
-    });
-
-    javaProcess.on('close', (code) => {
-      if (code === 0) {
-        resolve(decryptedData);
-      } else {
-        reject(`Error: El proceso Java se cerró con código de salida ${code}.`);
-      }
-    });
-  });
+  return (
+    decipher.update(dataToDecrypt, "base64", "utf8") + decipher.final("utf8")
+  );
 }
 
-// Llamar a la función decryptData con el dato que deseas desencriptar
-//const dataToDeEncrypt = 'Hu9oLwNPs9Z4RnCKUeMWBQ==';
-const dataToDeEncrypt = process.argv.slice(2)[0];
-decryptData(dataToDeEncrypt)
-  .then((decryptedData) => {
-    //console.log("Datos desencriptados:", decryptedData);
-  })
-  .catch((err) => {
-    //console.error("Error al desencriptar:", err);
-  });
+if (require.main === module) {
+  decryptData(process.argv[2])
+    .then((decryptedData) => {
+      console.log("Datos desencriptados:", decryptedData);
+    })
+    .catch((error) => {
+      console.error("Error al desencriptar:", error.message);
+      process.exitCode = 1;
+    });
+}
 
-  // Exportar los parámetros de conexión
 module.exports = { decryptData };

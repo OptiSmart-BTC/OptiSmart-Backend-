@@ -84,59 +84,213 @@ async function filtraSKU(passadminDeCripta) {
 
 async function reintegraIgnorados(nombreTablaFinal) {
   const passadminDeCripta = await getDecryptedPassadmin();
-  await filtraSKU(passadminDeCripta);
   const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
     passadminDeCripta
   )}@${host}:${puerto}/?authSource=admin`;
+
   const client = new MongoClient(uri);
   await client.connect();
   const db = client.db(dbName);
 
-  const tablaFinal = db.collection(nombreTablaFinal);
-  const actuales = await tablaFinal.find().toArray();
-  const camposBase = actuales.length > 0 ? Object.keys(actuales[0]) : [];
-  const ejemploReferencia = actuales[0] || {};
+  // Construir llaves SKU correctas
+  const ignoredSkuKeys = skuIgnorados.map(
+    (s) => `${s.Producto}@${s.Ubicacion}`
+  );
 
-  const nuevosRegistros = skuIgnorados.map((sku) => {
-    const nuevo = {};
-    for (const campo of camposBase) {
-      if (sku.hasOwnProperty(campo)) {
-        nuevo[campo] = sku[campo];
-      } else {
-        const valorEjemplo = ejemploReferencia[campo];
-        nuevo[campo] = typeof valorEjemplo === "number" ? 0 : "NA";
-      }
+  // 📌 Tablas donde deben aparecer los ignorados
+  const tablasObjetivo = [
+    nombreTablaFinal, // ui_sem_all_pol_inv o ui_sem_all_pol_inv_montecarlo
+    "ui_demanda_abcd",
+  ];
+
+  for (const tabla of tablasObjetivo) {
+    const col = db.collection(tabla);
+
+    // 🔥 1. BORRAR LOS SKUs IGNORADOS EXISTENTES
+    await col.deleteMany({ SKU: { $in: ignoredSkuKeys } });
+
+    // 🔧 2. INSERTAR placeholders limpios
+    const docs = skuIgnorados.map((sku) => {
+      const key = `${sku.Producto}@${sku.Ubicacion}`;
+      const snap = snapCSBySKU.get(key) || {};
+      const clas = snap.Clasificacion_ABCD || "SIN DEMANDA";
+      const snapDem = snapDemBySKU.get(key) || {};
+
+      return {
+        SKU: key,
+        Producto: sku.Producto,
+        Ubicacion: sku.Ubicacion,
+        Desc_Producto: sku.Desc_Producto || snap.Desc_Producto || "NA",
+        Familia_Producto: sku.Familia_Producto || snap.Familia_Producto || "NA",
+        Categoria: sku.Categoria || snap.Categoria || "NA",
+        Presentacion: sku.Presentacion || snap.Presentacion || "NA",
+        Desc_Ubicacion: sku.Desc_Ubicacion || snap.Desc_Ubicacion || "NA",
+        Clasificacion: clas,
+        Nivel_Servicio: 0,
+        Valor_Z: 0,
+        UOM: "DEFAULT",
+        UOM_Base: sku.Presentacion || snap.Presentacion || "NA",
+        Unidades_Empaque: 0,
+        Demanda_Promedio_Semanal: sku.Demanda_Promedio_Semanal || 0,
+        Lead_Time_Abasto: 0,
+        Variabilidad_Demanda_Cantidad: 0,
+        DS_Demanda: 0,
+        Fill_Rate: 0,
+        Frecuencia_Revision_dias: 0,
+        Prom_LT: 0,
+        DS_LT: 0,
+        Override_SI_NO: "NO",
+        Override_Min_Politica_Inventarios: null,
+        Override_Max_Politica_Inventarios: null,
+        SS_Cantidad: 0,
+        Demanda_LT: 0,
+        MOQ: 0,
+        ROQ: 0,
+        ROP: 0,
+        META: 0,
+        Inventario_Promedio: 0,
+        Medida_Override: "NA",
+        Tipo_Override: "NA",
+        STAT_SS: 0,
+        Override_SS_Cantidad: 0,
+        Override_SS_Cantidad: 0,
+        DC_SS: 0,
+        DC_Demanda_LT: 0,
+        DC_MOQ: 0,
+        DC_ROQ: 0,
+        DC_ROP: 0,
+        DC_META: 0,
+        DC_Inventario_Promedio: 0,
+        DC_Vida_Util_Dias: 0,
+        DC_Tolerancia_Vida_Util_Dias: 0,
+        DC_ROP_Alto: 0,
+        DC_SobreInventario_Dias: 0,
+        P_SS: 0,
+        P_Demanda_LT: 0,
+        P_MOQ: 0,
+        P_ROQ: 0,
+        P_ROP: 0,
+        P_META: 0,
+        P_Inventario_Promedio: 0,
+        C_SS: 0,
+        C_Demanda_LT: 0,
+        C_MOQ: 0,
+        C_ROQ: 0,
+        C_ROP: 0,
+        C_META: 0,
+        C_Inventario_Promedio: 0,
+        U_SS: 0,
+        U_Demanda_LT: 0,
+        U_MOQ: 0,
+        U_ROQ: 0,
+        U_ROP: 0,
+        U_META: 0,
+        U_Inventario_Promedio: 0,
+        Ignorado: "SI",
+      };
+    });
+
+    if (docs.length > 0) {
+      await col.insertMany(docs);
+      console.log(`Reintegrados ${docs.length} SKUs a ${tabla}`);
     }
-    return nuevo;
-  });
-
-  if (nuevosRegistros.length > 0) {
-    await tablaFinal.insertMany(nuevosRegistros);
-    console.log(
-      `Reintegrados ${nuevosRegistros.length} SKU a ${nombreTablaFinal}`
-    );
   }
 
+  // ▶ Finalmente, reintegrar a colección SKU
   const skuCollection = db.collection("sku");
-  if (skuIgnorados.length > 0) {
-    const ignoradosReformateados = skuIgnorados.map(({ _id, ...resto }) => ({
-      ...resto,
-      Ignorar: 1,
-    }));
-    await skuCollection.insertMany(ignoradosReformateados);
-    console.log(
-      `Reintegrados ${ignoradosReformateados.length} SKU a colección 'sku'`
-    );
+
+  // si quieres, esto puede quedarse siempre (no truena)
+  await skuCollection.deleteMany({ Ignorar: 1 });
+
+  const skuIgnDocs = skuIgnorados.map(({ _id, ...rest }) => ({
+    ...rest,
+    Ignorar: 1,
+  }));
+
+  if (skuIgnDocs.length > 0) {
+    await skuCollection.insertMany(skuIgnDocs);
   }
 
+  await client.close();
+  console.log("Reintegración semanal completada sin duplicados.");
+}
+
+async function cargaSKUIgnorados(passadminDeCripta) {
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+
+  const client = new MongoClient(uri);
+  await client.connect();
+  const db = client.db(dbName);
+  const skuCollection = db.collection("sku");
+
+  const todosSKU = await skuCollection.find().toArray();
+  console.log("TOTAL SKU en base:", todosSKU.length);
+
+  skuIgnorados = todosSKU.filter(
+    (sku) => sku.Ignorar === 1 || sku.Ignorar === "1"
+  );
+  const skuPermitidos = todosSKU.filter(
+    (sku) => !(sku.Ignorar === 1 || sku.Ignorar === "1")
+  );
+
+  console.log("SKUs ignorados:", skuIgnorados.length);
+  console.log("SKUs permitidos:", skuPermitidos.length);
+
+  await client.close();
+}
+
+let snapCSBySKU = new Map();
+let snapDemBySKU = new Map();
+
+async function snapshotIgnoradosCS(passadminDeCripta) {
+  const uri = `mongodb://${encodeURIComponent(DBUser)}:${encodeURIComponent(
+    passadminDeCripta
+  )}@${host}:${puerto}/?authSource=admin`;
+
+  const client = new MongoClient(uri);
+  await client.connect();
+  const db = client.db(dbName);
+
+  const ignoredSkuKeys = skuIgnorados.map(
+    (s) => `${s.Producto}@${s.Ubicacion}`
+  );
+
+  // Preferimos la UI ya formateada por CS18
+  const colUiDem = db.collection("demanda_abcd_01_sem");
+
+  const uiDocs = await colUiDem
+    .find({ SKU: { $in: ignoredSkuKeys } })
+    .toArray();
+
+  for (const d of uiDocs) {
+    snapDemBySKU.set(String(d.SKU), d);
+
+    snapCSBySKU.set(String(d.SKU), {
+      Desc_Producto: d.Desc_Producto,
+      Familia_Producto: d.Familia_Producto,
+      Categoria: d.Categoria,
+      Presentacion: d.Presentacion,
+      Desc_Ubicacion: d.Desc_Ubicacion,
+      Clasificacion:
+        d.Clasificacion_ABCD || d.Clasificacion || d.Clasificacion_Demanda,
+    });
+  }
+
+  console.log(
+    `[Snapshot CS] Capturados ${uiDocs.length} ignorados desde ui_demanda_abcd`
+  );
   await client.close();
 }
 
 async function IniciaejecutarArchivos() {
   const passadminDeCripta = await getDecryptedPassadmin();
-  await filtraSKU(passadminDeCripta);
 
-  const archivos = [
+  // 0) Cargar lista de ignorados SIN borrarlos todavía
+  await cargaSKUIgnorados(passadminDeCripta);
+
+  const archivosCS = [
     {
       nombre: "CS00_limpiaTablasProcesos.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -224,6 +378,8 @@ async function IniciaejecutarArchivos() {
       nombre: "CS19_Inserta_LastUpdate.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
+  ];
+  const archivosPS = [
     {
       nombre: "PS00_limpia_politica_inv.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
@@ -304,7 +460,7 @@ async function IniciaejecutarArchivos() {
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
-      nombre: "PS17_Calcula_Dias_Cobertura.js",
+      nombre: "PS17_Calcula_Dias_Cobertura_v2.js",
       parametros: `${dbName} ${DBUser} ${passadminDeCripta}`,
     },
     {
@@ -338,11 +494,24 @@ async function IniciaejecutarArchivos() {
     `Inicio de ejecucion: ${moment().format("YYYY-MM-DD HH:mm:ss")}\n`
   );
 
-  for (const archivo of archivos) {
+  const resumeCSFrom = process.env.RESUME_CS_FROM;
+  let archivosCSAEjecutar = archivosCS;
+  if (resumeCSFrom) {
+    const resumeIndex = archivosCS.findIndex(
+      (archivo) => archivo.nombre === resumeCSFrom
+    );
+    if (resumeIndex === -1) {
+      throw new Error(`RESUME_CS_FROM invalido: ${resumeCSFrom}`);
+    }
+    archivosCSAEjecutar = archivosCS.slice(resumeIndex);
+    writeToLog(`Reanudando CS desde: ${resumeCSFrom}`);
+  }
+
+  // --- correr CS ---
+  for (const archivo of archivosCSAEjecutar) {
     const inicio = moment();
     const comando = `node ${archivo.nombre} ${archivo.parametros}`;
     console.log(`${archivo.nombre}`);
-
     writeToLog(`\n------------------------------`);
     writeToLog(
       `Inicio de ${archivo.nombre}: ${inicio.format("YYYY-MM-DD HH:mm:ss")}`
@@ -351,35 +520,84 @@ async function IniciaejecutarArchivos() {
     try {
       await ejecutarComando(comando);
       const fin = moment();
-      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
       writeToLog(
         `Fin de ${archivo.nombre}: ${fin.format("YYYY-MM-DD HH:mm:ss")}`
       );
-      writeToLog(`Duración: ${duracion} segundos`);
+      writeToLog(
+        `Duración: ${moment
+          .duration(fin.diff(inicio))
+          .asSeconds()
+          .toFixed(2)} segundos`
+      );
     } catch (error) {
       const fin = moment();
-      const duracion = moment.duration(fin.diff(inicio)).asSeconds().toFixed(2);
       writeToLog(
-        `Error en ${archivo.nombre} tras ${duracion} segundos: ${error}`
+        `Error en ${archivo.nombre} tras ${moment
+          .duration(fin.diff(inicio))
+          .asSeconds()
+          .toFixed(2)} segundos: ${error}`
       );
+      // si CS falla, normalmente conviene cortar aquí
+      throw error;
     }
   }
 
-  const now_fin = moment().format("YYYY-MM-DD HH:mm:ss");
-  writeToLog(`\n\n`);
-  writeToLog(
-    `Terminan el Proceso de Clasificacion ABCD por Semana: ${now_fin}\n`
-  );
+  // 3) Snapshot de lo calculado por CS para ignorados (ABCD, desc, etc.)
+  await snapshotIgnoradosCS(passadminDeCripta);
 
+  // 4) Ahora sí filtrar SKUs para que PS corra solo con permitidos
+  await filtraSKU(passadminDeCripta);
+
+  // --- correr PS ---
+  for (const archivo of archivosPS) {
+    const inicio = moment();
+    const comando = `node ${archivo.nombre} ${archivo.parametros}`;
+    console.log(`${archivo.nombre}`);
+    writeToLog(`\n------------------------------`);
+    writeToLog(
+      `Inicio de ${archivo.nombre}: ${inicio.format("YYYY-MM-DD HH:mm:ss")}`
+    );
+
+    try {
+      await ejecutarComando(comando);
+      const fin = moment();
+      writeToLog(
+        `Fin de ${archivo.nombre}: ${fin.format("YYYY-MM-DD HH:mm:ss")}`
+      );
+      writeToLog(
+        `Duración: ${moment
+          .duration(fin.diff(inicio))
+          .asSeconds()
+          .toFixed(2)} segundos`
+      );
+    } catch (error) {
+      const fin = moment();
+      writeToLog(
+        `Error en ${archivo.nombre} tras ${moment
+          .duration(fin.diff(inicio))
+          .asSeconds()
+          .toFixed(2)} segundos: ${error}`
+      );
+      throw error;
+    }
+  }
+
+  // 5) Reintegrar ignorados (ya con snapshot) a la tabla final semanal
   const nombreFinal = parametroUsuario.toLowerCase().includes("montecarlo")
-    ? "ui_sem_all_pol_inv_montecarlo"
-    : "ui_sem_all_pol_inv";
+    ? "ui_all_pol_inv_montecarlo_sem"
+    : "ui_all_pol_inv_sem";
+
   await reintegraIgnorados(nombreFinal);
+
+  const now_fin = moment().format("YYYY-MM-DD HH:mm:ss");
+  writeToLog(
+    `\nTerminan el Proceso de Clasificacion ABCD por Semana: ${now_fin}\n`
+  );
 }
 
 function ejecutarComando(comando) {
   return new Promise((resolve, reject) => {
-    exec(comando, (error, stdout, stderr) => {
+    exec(comando, { maxBuffer: 50 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         reject(error);
       } else {

@@ -26,6 +26,12 @@ async function actualizarInventarioDisponible() {
     const invDispoCollection = db.collection('inventario_disponible');
     const planRepoCollection = db.collection('plan_reposicion_01_sem');
 
+    await Promise.all([
+      invDispoCollection.createIndex({ SKU: 1, Ubicacion: 1 }),
+      planRepoCollection.createIndex({ SKU: 1, Ubicacion: 1 }),
+      db.collection('sku').createIndex({ SKU: 1 })
+    ]);
+
     const datosinvDispo = await invDispoCollection.find().toArray();
 
     const updates = datosinvDispo.map(dato => {

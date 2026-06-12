@@ -1,8 +1,8 @@
-const fs = require('fs');
-const { MongoClient } = require('mongodb');
-const conex = require('../Configuraciones/ConStrDB');
-const moment = require('moment');
-const { host, puerto } = require('../Configuraciones/ConexionDB');
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv[2];
 const DBUser = process.argv[3];
@@ -13,12 +13,14 @@ const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 const parte = dbName.substring(dbName.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
 const logFile = `../../${parametroFolder}/log/PlanReposicion_Sem.log`;
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
-const collection1 = 'plan_reposicion_01_sem';
+const collection1 = "plan_reposicion_01_sem";
 
 async function actualizarDatos() {
-  writeToLog(`\nPaso 05 - Evaluación de Requiere_Reposicion (Nivel ${nivelFiltrado})`);
+  writeToLog(
+    `\nPaso 05 - Evaluación de Requiere_Reposicion (Nivel ${nivelFiltrado})`
+  );
 
   let client;
   try {
@@ -26,7 +28,17 @@ async function actualizarDatos() {
     const db = client.db(dbName);
     const col = db.collection(collection1);
 
-    const filtro = nivelFiltrado !== null ? { Nivel_OA: nivelFiltrado } : {};
+    // ✅ FIX: que jale aunque Nivel_OA esté guardado como "1" (string) o 1 (number)
+    const filtro =
+      nivelFiltrado !== null
+        ? {
+            $or: [
+              { Nivel_OA: nivelFiltrado },
+              { Nivel_OA: String(nivelFiltrado) },
+            ],
+          }
+        : {};
+
     const docs = await col.find(filtro).toArray();
 
     const updates = [];
@@ -36,26 +48,32 @@ async function actualizarDatos() {
       const inv = doc.Inventario_Disponible || 0;
       const trans = doc.Cantidad_Transito || 0;
       const conf = doc.Cantidad_Confirmada_Total || 0;
-      const demandaInd = doc.Cantidad_Demanda_Indirecta ?? doc["Cantidad Demanda Indirecta"] ?? 0;
+      const demandaInd =
+        doc.Cantidad_Demanda_Indirecta ??
+        doc["Cantidad Demanda Indirecta"] ??
+        0;
       const rop = doc.ROP || 0;
 
-      if (typeof doc.Nivel_OA !== 'number') {
-        writeToLog(` Documento omitido por Nivel_OA inválido (SKU=${doc.SKU}): Nivel_OA = ${doc.Nivel_OA}`);
+      // ✅ AQUÍ VA LO DEL nivelOA
+      const nivelOA = Number(doc.Nivel_OA);
+      if (Number.isNaN(nivelOA)) {
+        writeToLog(
+          `⚠️ Documento omitido por Nivel_OA inválido (SKU=${doc.SKU}): Nivel_OA = ${doc.Nivel_OA}`
+        );
         omitidos++;
         continue;
       }
 
-      const comparador = doc.Nivel_OA >= 2
-        ? inv + trans - conf - demandaInd
-        : inv + trans - conf;
+      const comparador =
+        nivelOA >= 2 ? inv + trans - conf - demandaInd : inv + trans - conf;
 
       const requiere = rop > comparador ? "Si" : "No";
 
       updates.push({
         updateOne: {
           filter: { _id: doc._id },
-          update: { $set: { Requiere_Reposicion: requiere } }
-        }
+          update: { $set: { Requiere_Reposicion: requiere } },
+        },
       });
     }
 
@@ -63,9 +81,13 @@ async function actualizarDatos() {
       await col.bulkWrite(updates);
     }
 
-    writeToLog(`\t Requiere_Reposicion actualizado en ${updates.length} documentos`);
-    if (omitidos > 0) writeToLog(`\t ${omitidos} documentos fueron omitidos por Nivel_OA inválido.`);
-
+    writeToLog(
+      `\t✔ Requiere_Reposicion actualizado en ${updates.length} documentos`
+    );
+    if (omitidos > 0)
+      writeToLog(
+        `\t⚠️ ${omitidos} documentos fueron omitidos por Nivel_OA inválido.`
+      );
   } catch (error) {
     writeToLog(`${now} - [ERROR] ${error.message}`);
   } finally {
@@ -74,7 +96,7 @@ async function actualizarDatos() {
 }
 
 function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
+  fs.appendFileSync(logFile, message + "\n");
 }
 
 actualizarDatos().catch(console.error);

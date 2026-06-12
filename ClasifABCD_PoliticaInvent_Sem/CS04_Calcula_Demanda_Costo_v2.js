@@ -41,6 +41,10 @@ async function realizarAgregacion_Demanda_UOM() {
     const fechaInicioObj = new Date(resultado.fechaInicio);
     const fechaFinObj = new Date(resultado.fechaFin);
 
+    await db.collection("sku").createIndex(
+      { Producto: 1, Ubicacion: 1 },
+      { name: "Producto_1_Ubicacion_1" }
+    );
 
 
 

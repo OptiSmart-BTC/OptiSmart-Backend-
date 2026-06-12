@@ -1,7 +1,6 @@
 const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const conex = require("../Configuraciones/ConStrDB");
-
 const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv[2];
@@ -21,13 +20,38 @@ async function crearTablaPoliticaInventarios() {
     await client.connect();
     const db = client.db(dbName);
 
-    const baseCollection = db.collection(uiCollectionName);
+    const isMontecarlo = uiCollectionName.includes("montecarlo");
     const targetCollection = db.collection(allPolInvCollectionName);
 
     await targetCollection.deleteMany();
 
+    let baseDocs;
 
-    const baseDocs = await baseCollection.find().toArray();
+    if (isMontecarlo) {
+      // Fusionar política normal + Montecarlo
+      const normalDocs = await db
+        .collection("ui_politica_inventarios")
+        .find()
+        .toArray();
+      const mcDocs = await db
+        .collection("ui_politica_inventarios_montecarlo")
+        .find()
+        .toArray();
+
+      const combinedMap = new Map();
+      for (const doc of normalDocs) combinedMap.set(doc.SKU, doc);
+      for (const doc of mcDocs) combinedMap.set(doc.SKU, doc);
+
+      baseDocs = Array.from(combinedMap.values());
+    } else {
+      // Normal como siempre
+      baseDocs = await db
+        .collection("ui_politica_inventarios")
+        .find()
+        .toArray();
+    }
+
+    // Prepara documentos formateados (igual que tu script original)
     const formattedDocs = baseDocs.map((doc) => ({
       ...doc,
       SS_Cantidad: doc.SS_Cantidad ?? 0,
@@ -65,10 +89,16 @@ async function crearTablaPoliticaInventarios() {
       U_Inventario_Promedio: 0,
     }));
 
+    if (!formattedDocs || formattedDocs.length === 0) {
+      console.log(
+        "P21_UneTablas: No hay documentos para insertar (formattedDocs vacío). Se omite insertMany.",
+      );
+      return;
+    }
+
     await targetCollection.insertMany(formattedDocs);
 
-    const isMontecarlo = uiCollectionName.includes("montecarlo");
-
+    // Igual que tu código original: une las colecciones auxiliares
     const mergeSources = [
       {
         collection: isMontecarlo
@@ -93,7 +123,6 @@ async function crearTablaPoliticaInventarios() {
     ];
 
     for (const { collection, prefix, extras = [] } of mergeSources) {
-      const auxCollection = db.collection(collection);
       const results = await targetCollection
         .aggregate([
           {
@@ -126,7 +155,7 @@ async function crearTablaPoliticaInventarios() {
                     [`${prefix}_SobreInventario_Dias`]:
                       "$joined.SobreInventario_Dias",
                   }
-                : {}
+                : {},
             ),
           },
         ])
@@ -157,9 +186,9 @@ async function crearTablaPoliticaInventarios() {
                     [`${prefix}_SobreInventario_Dias`]:
                       doc[`${prefix}_SobreInventario_Dias`] ?? 0,
                   }
-                : {}
+                : {},
             ),
-          }
+          },
         );
       }
     }

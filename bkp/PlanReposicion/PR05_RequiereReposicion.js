@@ -1,9 +1,9 @@
-const fs = require('fs');
-const { MongoClient } = require('mongodb');
-const conex= require('../Configuraciones/ConStrDB');
-const moment = require('moment');
+const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const conex = require("../Configuraciones/ConStrDB");
+const moment = require("moment");
 
-const { host, puerto } = require('../Configuraciones/ConexionDB');
+const { host, puerto } = require("../Configuraciones/ConexionDB");
 
 const dbName = process.argv.slice(2)[0];
 const DBUser = process.argv.slice(2)[1];
@@ -11,16 +11,15 @@ const DBPassword = process.argv.slice(2)[2];
 
 //const url = `mongodb://${host}:${puerto}/${dbName}`;
 //const url = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
-const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
+const mongoUri = conex.getUrl(DBUser, DBPassword, host, puerto, dbName);
 
 const parametro = dbName;
 const parte = parametro.substring(parametro.lastIndexOf("_") + 1);
 const parametroFolder = parte.toUpperCase();
-const logFile = `../../${parametroFolder}/log/PlanReposicion.log`; 
-const now = moment().format('YYYY-MM-DD HH:mm:ss');
+const logFile = `../../${parametroFolder}/log/PlanReposicion.log`;
+const now = moment().format("YYYY-MM-DD HH:mm:ss");
 
-
-const collection1 = 'plan_reposicion_01';
+const collection1 = "plan_reposicion_01";
 //const collection2 = 'politica_inventarios_01';
 
 // Realizar la operación de join y actualización
@@ -30,60 +29,64 @@ async function actualizarDatos() {
 
   let client;
   try {
+    client = await MongoClient.connect(mongoUri);
+    //const client = await MongoClient.connect(url);
+    const db = client.db(dbName);
 
-  client = await MongoClient.connect(mongoUri);
-  //const client = await MongoClient.connect(url);
-  const db = client.db(dbName);
+    //const col1 = db.collection(collection1);
+    const collection = db.collection("plan_reposicion_01"); // Reemplaza con el nombre de tu colección
 
-  //const col1 = db.collection(collection1);
-  const collection = db.collection('plan_reposicion_01'); // Reemplaza con el nombre de tu colección
-
-  const pipeline = [
-    {
-      $project: {
-        SKU: 1,
-        Producto: 1,
-        Desc_Producto: 1,
-        Familia_Producto: 1,
-        Categoria: 1,
-        Segmentacion_Producto: 1,
-        Presentacion: 1,
-        Ubicacion: 1,
-        Desc_Ubicacion: 1,
-        UOM_Base: 1,
-        Inventario_Disponible: 1,
-        Cantidad_Transito: 1,
-        Cantidad_Confirmada_Total: 1,       
-        SS_Cantidad: 1,
-        ROP: 1,
-        META: 1,
-        Requiere_Reposicion: {
-          $cond: {
-            if: {
-              $gt: [
-                '$ROP',
-                {
-                  $subtract: [
-                    { $add: ['$Inventario_Disponible', '$Cantidad_Transito'] },
-                    '$Cantidad_Confirmada_Total',
-                  ],
-                },
-              ],
+    const pipeline = [
+      {
+        $project: {
+          SKU: 1,
+          Producto: 1,
+          Desc_Producto: 1,
+          Familia_Producto: 1,
+          Categoria: 1,
+          Segmentacion_Producto: 1,
+          Presentacion: 1,
+          Ubicacion: 1,
+          Desc_Ubicacion: 1,
+          UOM_Base: 1,
+          Inventario_Disponible: 1,
+          Cantidad_Transito: 1,
+          Cantidad_Confirmada_Total: 1,
+          SS_Cantidad: 1,
+          ROP: 1,
+          META: 1,
+          Requiere_Reposicion: {
+            $cond: {
+              if: {
+                $gt: [
+                  { $ifNull: ["$ROP", 0] },
+                  {
+                    $subtract: [
+                      {
+                        $add: [
+                          { $ifNull: ["$Inventario_Disponible", 0] },
+                          { $ifNull: ["$Cantidad_Transito", 0] },
+                        ],
+                      },
+                      { $ifNull: ["$Cantidad_Confirmada_Total", 0] },
+                    ],
+                  },
+                ],
+              },
+              then: "Si",
+              else: "No",
             },
-            then: 'Si',
-            else: 'No',
           },
         },
       },
-    },
-    {
-      $out: 'plan_reposicion_01', // Nombre de la colección de salida
-    },
-  ];
+      {
+        $out: "plan_reposicion_01", // Nombre de la colección de salida
+      },
+    ];
 
-  await collection.aggregate(pipeline).toArray();
+    await collection.aggregate(pipeline).toArray();
 
-  writeToLog(`\tTermina el Calculo del Inventario en Transito`);
+    writeToLog(`\tTermina el Calculo del Inventario en Transito`);
   } catch (error) {
     // Manejar el error
     writeToLog(`${now} - [ERROR] ${error.message}`);
@@ -96,7 +99,7 @@ async function actualizarDatos() {
 }
 
 function writeToLog(message) {
-  fs.appendFileSync(logFile, message + '\n');
+  fs.appendFileSync(logFile, message + "\n");
 }
 
 // Llamar a la función para actualizar los datos

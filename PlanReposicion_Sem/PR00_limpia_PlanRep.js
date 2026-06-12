@@ -22,7 +22,7 @@ const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
 
 
 const collectionsToDelete = [
-  'plan_reposicion_01_se,',
+  'plan_reposicion_01_sem',
   'ui_sem_plan_reposicion'
 ];
 

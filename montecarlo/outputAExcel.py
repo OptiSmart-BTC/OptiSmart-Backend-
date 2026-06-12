@@ -45,6 +45,33 @@ def calcular_exceso_inventario(ss, avg_eval, max_eval):
 
 
 
+
+def to_float_or_none(x):
+    if x is None:
+        return None
+    if isinstance(x, str) and x.strip() in ["", "NA", "NaN", "nan", "null"]:
+        return None
+    try:
+        return float(x)
+    except Exception:
+        return None
+
+def calcular_roq_fallback(demanda_lt, moq):
+    """Calcula el ROQ del META generado
+    """
+    d = to_float_or_none(demanda_lt) or 0.0
+    m = to_float_or_none(moq) or 0.0
+    if m <= 0:
+        return 0.0
+    return math.ceil(d / m) * m
+
+def meta_from_ss_roq(ss_val, roq_val):
+    """despejar y resolver la formulaMETA = ROQ + (SS_Cantidad o 0 si null)."""
+    ss = to_float_or_none(ss_val)
+    roq = to_float_or_none(roq_val) or 0.0
+    return roq + (0.0 if ss is None else ss)
+
+
 def conexion_url(db_user, db_password, host, port, db_name):
     return f"mongodb://{db_user}:{db_password}@{host}:{port}/?authSource=admin"
 
@@ -54,16 +81,19 @@ db_user = sys.argv[2]
 db_password = sys.argv[3]
 host = sys.argv[4]
 port = sys.argv[5]
+tipo_proceso = sys.argv[6] if len(sys.argv) > 6 else "Semanal"  # default semanal
 
-# Construir la URL de conexión
+# Construir conexión
 mongo_url = conexion_url(db_user, db_password, host, port, db_name)
 client = pymongo.MongoClient(mongo_url)
-
-# Conectar a la base de datos y a la colección
 db = client[db_name]
 
-# Ruta al archivo Excel adjunto
-opti_data_path = db["ui_sem_all_pol_inv"]
+# Seleccionar colección de políticas base
+if tipo_proceso.lower() == "diario":
+    opti_data_path = db["ui_all_pol_inv"]
+else:
+    opti_data_path = db["ui_sem_all_pol_inv"]
+
 hist_demanda = db['historico_demanda']
 sku_datos = db['sku']
 coleccionFecha = db['parametros_usuario']
@@ -111,7 +141,7 @@ skus_aleatorios = pd.Series(ss_data['SKU'].unique()).sample(n=num_skus, random_s
 skus_aleatorios = [sku for sku in skus_aleatorios if sku in skus_con_datos]
 
 # Preparar DataFrame para resultados
-resultados = pd.DataFrame(columns=['SKU','SS_Opti', 'SS_Semanal', 'SS_Diario', 'SS_Modelo', 'AVG_Sem_Calc', 'MAX_Sem_Calc', 'Num_0_Sem', '/','AVG_Sem_Eval', 'MAX_Sem_Eval', '//', 'Mejor Distribucion', 'P-value', 'Normal?', '///', 'Cob_Opti', 'Cob_Sem', 'Cob_Dia', 'Cob_Mod', '////', 'MC_SS_Opti', 'MC_SS_Sem', 'MC_SS_Dia', 'MC_SS_Mod', '/////', 'exceso_opti', 'exceso_sem', 'exceso_dia', 'exceso_mod', '//////', 'pts_opti', 'pts_sem', 'pts_dia', 'pts_mod', '///////', 'mejor'])
+resultados = pd.DataFrame(columns=['SKU','SS_Opti', 'SS_Semanal', 'SS_Diario', 'SS_Modelo', 'ROQ', 'META_Opti', 'META_Sem', 'META_Dia', 'META_Mod', 'META_Seleccionada', 'AVG_Sem_Calc', 'MAX_Sem_Calc', 'Num_0_Sem', '/','AVG_Sem_Eval', 'MAX_Sem_Eval', '//', 'Mejor Distribucion', 'P-value', 'Normal?', '///', 'Cob_Opti', 'Cob_Sem', 'Cob_Dia', 'Cob_Mod', '////', 'MC_SS_Opti', 'MC_SS_Sem', 'MC_SS_Dia', 'MC_SS_Mod', '/////', 'exceso_opti', 'exceso_sem', 'exceso_dia', 'exceso_mod', '//////', 'pts_opti', 'pts_sem', 'pts_dia', 'pts_mod', '///////', 'mejor'])
 
 #skus_aleatorios = ['A00342@FARMACIA', 'A00015@FARMACIA', 'A00015@FARMACIA'] 
 minimo_registros_necesarios = 1
@@ -122,7 +152,23 @@ for sku in skus_aleatorios: # para cada sku
     #
     # Ejecutar las tres funciones de simulación para el SKU actual
     #
-    lead_time = data_sku[data_sku['SKU'] == sku]['LeadTime_Abasto_Dias'].values[0]
+    # Buscar LeadTime_Abasto_Dias del SKU en data_sku
+    filtro = data_sku[data_sku['SKU'] == sku]
+
+    if filtro.empty:
+        print(f"[WARN] SKU {sku} no encontrado en data_sku, se omite LeadTime_Abasto_Dias")
+        lead_time = None
+    else:
+        lead_time = filtro['LeadTime_Abasto_Dias'].values[0]
+
+    # Validar lead_time antes de usarlo
+    if lead_time is None or pd.isna(lead_time):
+        # Si no hay lead_time, puedes decidir:
+        # 1) saltar este SKU:
+        continue
+        # 2) o asignar un default, por ejemplo 0:
+        # lead_time = 0
+
     lead_time_sem = math.ceil(lead_time / 7)
     
     if (data_hist_eval['SKU'] == sku).sum() >= minimo_registros_necesarios:
@@ -147,6 +193,9 @@ for sku in skus_aleatorios: # para cada sku
     # Obtener el valor de SS_Cantidad (U_SS en este caso) para el SKU actual del archivo Excel
     ss_cantidad = ss_data[ss_data['SKU'] == sku]['SS_Cantidad'].values[0] if sku in ss_data['SKU'].values else None
     
+    if ss_cantidad in [None, "NA", "NaN", ""]:
+        ss_cantidad = None
+
     """
     Fin seccion calculo SS
     """
@@ -240,7 +289,47 @@ for sku in skus_aleatorios: # para cada sku
     #
     # agregar al dataframe de excel    
     #
-    new = pd.DataFrame({'SKU': [sku], 'SS_Opti': [ss_cantidad], 'SS_Semanal': [semanal], 'SS_Diario': [diario], 'SS_Modelo': [modelo], 'AVG_Sem_Calc': [promedio], 'MAX_Sem_Calc': [alto], 'Num_0_Sem': [cant_ceros], '/': None, 'AVG_Sem_Eval': [promedio_eval], 'MAX_Sem_Eval': [alto_eval],'//': None, 'Mejor Distribucion': [best_fit], 'P-value': [p_value], 'Normal?': [es_normal], '///': None, 'Cob_Opti':[cob_opti], 'Cob_Sem':[cob_sem], 'Cob_Dia':[cob_dia], 'Cob_Mod':[cob_mod], '////': None, 'MC_SS_Opti': [resultados_MC_SS['SS_Opti']], 'MC_SS_Sem': [resultados_MC_SS['SS_Sem']], 'MC_SS_Dia': [resultados_MC_SS['SS_Dia']], 'MC_SS_Mod': [resultados_MC_SS['SS_Mod']], '/////': None, 'exceso_opti':exceso_opti, 'exceso_sem':exceso_sem, 'exceso_dia':exceso_dia, 'exceso_mod':exceso_mod, '//////': None, 'pts_opti': [pts_opti], 'pts_sem': [pts_sem], 'pts_dia': [pts_dia], 'pts_mod': [pts_mod], '///////': None, 'mejor': [mejor_modelo_ss]})
+
+    roq = 0.0
+    try:
+        if "ROQ" in ss_data.columns:
+            roq = ss_data[ss_data["SKU"] == sku]["ROQ"].values[0]
+        else:
+            demanda_lt = ss_data[ss_data["SKU"] == sku]["Demanda_LT"].values[0] if "Demanda_LT" in ss_data.columns else None
+            moq = ss_data[ss_data["SKU"] == sku]["MOQ"].values[0] if "MOQ" in ss_data.columns else None
+            roq = calcular_roq_fallback(demanda_lt, moq)
+    except Exception:
+        # último fallback
+        demanda_lt = None
+        moq = None
+        try:
+            demanda_lt = ss_data[ss_data["SKU"] == sku]["Demanda_LT"].values[0]
+            moq = ss_data[ss_data["SKU"] == sku]["MOQ"].values[0]
+        except Exception:
+            pass
+        roq = calcular_roq_fallback(demanda_lt, moq)
+
+    roq = to_float_or_none(roq) or 0.0
+
+    # -------------------------------------------------
+    # META por modelo (META = ROQ + SS)
+    # -------------------------------------------------
+    meta_opti = meta_from_ss_roq(ss_cantidad, roq)
+    meta_sem  = meta_from_ss_roq(semanal, roq)
+    meta_dia  = meta_from_ss_roq(diario, roq)
+    meta_mod  = meta_from_ss_roq(modelo, roq)
+
+    meta_sel = None
+    if mejor_modelo_ss == "Opti":
+        meta_sel = meta_opti
+    elif mejor_modelo_ss == "Sem":
+        meta_sel = meta_sem
+    elif mejor_modelo_ss == "Dia":
+        meta_sel = meta_dia
+    elif mejor_modelo_ss == "Mod":
+        meta_sel = meta_mod
+
+    new = pd.DataFrame({'SKU': [sku], 'SS_Opti': [ss_cantidad], 'SS_Semanal': [semanal], 'SS_Diario': [diario], 'SS_Modelo': [modelo], 'ROQ':[roq], 'META_Opti':[meta_opti], 'META_Sem':[meta_sem], 'META_Dia':[meta_dia], 'META_Mod':[meta_mod], 'META_Seleccionada':[meta_sel], 'AVG_Sem_Calc': [promedio], 'MAX_Sem_Calc': [alto], 'Num_0_Sem': [cant_ceros], '/': None, 'AVG_Sem_Eval': [promedio_eval], 'MAX_Sem_Eval': [alto_eval],'//': None, 'Mejor Distribucion': [best_fit], 'P-value': [p_value], 'Normal?': [es_normal], '///': None, 'Cob_Opti':[cob_opti], 'Cob_Sem':[cob_sem], 'Cob_Dia':[cob_dia], 'Cob_Mod':[cob_mod], '////': None, 'MC_SS_Opti': [resultados_MC_SS['SS_Opti']], 'MC_SS_Sem': [resultados_MC_SS['SS_Sem']], 'MC_SS_Dia': [resultados_MC_SS['SS_Dia']], 'MC_SS_Mod': [resultados_MC_SS['SS_Mod']], '/////': None, 'exceso_opti':exceso_opti, 'exceso_sem':exceso_sem, 'exceso_dia':exceso_dia, 'exceso_mod':exceso_mod, '//////': None, 'pts_opti': [pts_opti], 'pts_sem': [pts_sem], 'pts_dia': [pts_dia], 'pts_mod': [pts_mod], '///////': None, 'mejor': [mejor_modelo_ss]})
     resultados = pd.concat([resultados, new], ignore_index=True)
     
 # Guardar los resultados en MongoDB en lugar de un archivo Excel
@@ -253,5 +342,8 @@ coleccion_resultados = db["resultados_simulaciones"]
 coleccion_resultados.delete_many({})
 
 # Insertar los datos en la colección, si no existe MongoDB la creará automáticamente
-coleccion_resultados.insert_many(resultados_dict)
+if resultados_dict:
+    coleccion_resultados.insert_many(resultados_dict)
+else:
+    print("[MC] No se generaron resultados de simulación, no se insertó nada.")
 print("se guardo el archivo resultados_simulaciones.xlsx")

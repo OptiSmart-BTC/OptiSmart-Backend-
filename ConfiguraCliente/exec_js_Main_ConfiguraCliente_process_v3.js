@@ -58,13 +58,13 @@ const var_DBPassword = resultado.UserDB[0].DBPassword
 const var_DBName = resultado.UserDB[0].DBName
 const var_Rol = userInformation.rol || "No asignado";
 
-const var_PwBiUser = resultado.UserPwBi[0].PwBiUser
-const var_PwBiPassword = resultado.UserPwBi[0].PwBiPassword
-const var_PwBiURL = resultado.UserPwBi[0].PwBiURL
+//const var_PwBiUser = resultado.UserPwBi[0].PwBiUser
+//const var_PwBiPassword = resultado.UserPwBi[0].PwBiPassword
+//const var_PwBiURL = resultado.UserPwBi[0].PwBiURL
 
 const archivos = [
   { nombre: '00_Verifica_Folders_v3.js', parametros: `${parametroFolder} ${var_AppUser}` },
-  { nombre: '01_Crea_uservars_v4.js', parametros: `${parametroFolder} ${var_AppUser} ${var_AppPassword} ${var_Type} ${var_DBUser} ${var_DBPassword} ${var_DBName} "${var_UserName}" "${var_UserTitle}" "${var_UserCompany}" ${var_PwBiUser} ${var_PwBiPassword} ${var_PwBiURL} ${var_Rol}` }
+  { nombre: '01_Crea_uservars_v4.js', parametros: `${parametroFolder} ${var_AppUser} ${var_AppPassword} ${var_Type} ${var_DBUser} ${var_DBPassword} ${var_DBName} "${var_UserName}" "${var_UserTitle}" "${var_UserCompany}" ${var_Rol}` } //${var_PwBiUser} ${var_PwBiPassword} ${var_PwBiURL}
 ];
 
 ejecutarArchivos(archivos);

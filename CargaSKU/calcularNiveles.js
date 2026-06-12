@@ -87,14 +87,12 @@ async function calculateLevels() {
       }
     });
 
-    // 6. Actualizar en la colección por SKU concatenado
-    const bulkOps = skus.map(({ Producto, Ubicacion }) => {
-      const prod = String(Producto).padStart(5, '0');
-      const ubi = String(Ubicacion).padStart(4, '0');
+    // 6. Actualizar por _id para no cambiar el formato de Producto/Ubicacion.
+    const bulkOps = skus.map(({ _id, Ubicacion }) => {
       return {
         updateOne: {
-          filter: { Producto: prod, Ubicacion: ubi },
-          update: { $set: { Nivel_OA: levels[ubi] || 1 } }
+          filter: { _id },
+          update: { $set: { Nivel_OA: levels[String(Ubicacion)] || 1 } }
         }
       };
     });

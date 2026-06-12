@@ -22,35 +22,58 @@ async function calcularDemandaPorcentaje() {
   //const mongoURI = `mongodb://${DBUser}:${DBPassword}@${host}:${puerto}/${dbName}?authSource=admin`;
   const mongoUri =  conex.getUrl(DBUser,DBPassword,host,puerto,dbName);
   const collectionName = 'demanda_calculada_sem';
+  let client;
 
   try {
-    const client = await MongoClient.connect(mongoUri, { useNewUrlParser: true });
+    client = await MongoClient.connect(mongoUri, { useNewUrlParser: true });
     const db = client.db(dbName);
-    const demandas = await db.collection(collectionName).find().toArray();
-
-    for (const demanda of demandas) {
-      const ubicacion = demanda.Ubicacion;
-      const demandaCosto = demanda.Demanda_Costo;
-
-      const sumaDemandas = demandas.reduce((suma, d) => {
-        if (d.Ubicacion === ubicacion) {
-          suma += d.Demanda_Costo;
+    await db.collection(collectionName).aggregate([
+      {
+        $setWindowFields: {
+          partitionBy: "$Ubicacion",
+          output: {
+            Suma_Demanda_Ubicacion: {
+              $sum: "$Demanda_Costo",
+              window: { documents: ["unbounded", "unbounded"] }
+            }
+          }
         }
-        return suma;
-      }, 0);
-
-      const demandaPorcentaje = ((demandaCosto / sumaDemandas)*100) || 0;
-
-      await db.collection(collectionName).updateOne(
-        { _id: demanda._id },
-        { $set: { Demanda_Porcentaje: Number(demandaPorcentaje) } }
-      );
-    }
+      },
+      {
+        $set: {
+          Demanda_Porcentaje: {
+            $cond: [
+              { $ne: ["$Suma_Demanda_Ubicacion", 0] },
+              {
+                $multiply: [
+                  { $divide: ["$Demanda_Costo", "$Suma_Demanda_Ubicacion"] },
+                  100
+                ]
+              },
+              0
+            ]
+          }
+        }
+      },
+      { $unset: "Suma_Demanda_Ubicacion" },
+      {
+        $merge: {
+          into: collectionName,
+          on: "_id",
+          whenMatched: "replace",
+          whenNotMatched: "discard"
+        }
+      }
+    ], { allowDiskUse: true }).toArray();
 
     writeToLog(`\tTermina el Calculo del Porcentaje de la Demanda por Semana`);
-    client.close();
   } catch (error) {
-    writeToLog(`${now} - Error: ${err}`);
+    writeToLog(`${now} - Error: ${error}`);
+    process.exitCode = 1;
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }
 
